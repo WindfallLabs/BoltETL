@@ -1,0 +1,103 @@
+# Global Config Options
+
+## The directory to read/write cached data
+cache_dir = "C:\\Workspace\\tmpdb\\Data\\cached"
+
+
+# Datasources
+## See 'DataDefinitions.md' for documentation
+
+[data.Parcels]
+name = "Parcels"
+desc = """Missoula County Parcel Data.
+  NOTES:
+    Prefer GDB to shapefile to preserve field names."""
+source_dir = "C:\\Workspace\\tmpdb\\Data\\raw\\MSL - Missoula Parcels"
+filename = "Missoula_Parcels.gdb"
+provider = "Montana State Library | Montana Dept of Revenue"
+source_url = "http://ftpgeoinfo.msl.mt.gov/Data/Spatial/MSDI/Cadastral/Parcels/Missoula/Missoula_GDB.zip"
+use_cache = true
+
+
+[data.LegislativeDistricts]
+name = "LegislativeDistricts"
+desc = """Montana's House and Senate districts for 2024-2032"""
+source_dir = ""
+filename = ""
+provider = "Montana State Library"
+source_url = "https://ftpgeoinfo.msl.mt.gov/Data/Spatial/MSDI/AdministrativeBoundaries/MontanaLegislativeDistricts_2024_2032_shp.zip"
+use_cache = true
+
+
+[data.Structures]
+name = "Structures"
+desc = """Montana Structures Framework"""
+source_dir = ""
+filename = ""
+provider = "Montana State Library"
+source_url = "https://ftpgeoinfo.msl.mt.gov/Data/Spatial/MSDI/AddressStructures/StructuresFramework_shp.zip"
+use_cache = true
+
+
+[data.Townships]
+name = "Townships"
+desc = """N/A"""
+source_dir = ""
+filename = ""
+provider = "Montana State Library"
+source_url = "https://ftpgeoinfo.msl.mt.gov/Data/Spatial/NonMSDI/Shapefiles/Township1996.zip"
+use_cache = true
+
+
+[data.CR0174]
+name = "CR0174"
+desc = """N/A"""
+source_dir = "C:\\Workspace\\tmpdb\\Data\\raw\\CR - CR0174"
+filename = "*CR-0174*.csv"
+provider = "CleverReports"
+use_cache = true
+
+
+[data.RCPMonthlyNTD]
+name = "RCPMonthlyNTD"
+desc = """N/A"""
+source_dir = "C:\\Workspace\\tmpdb\\Data\\raw\\RCP - NTD Month Report"
+filename = "*-NTD_MONTH_REPORT.XLSX"
+provider = "RideCheck+"
+use_cache = true
+
+
+[data.DriverShifts]
+name = "DriverShifts"
+desc = """N/A"""
+source_dir = "C:\\Workspace\\tmpdb\\Data\\raw\\Via - Driver Shifts"
+filename = "*Driver Shifts*.xlsx"
+provider = "Via"
+use_cache = true
+
+
+[data.RiderAccounts]
+name = "RiderAccounts"
+desc = """N/A"""
+source_dir = "C:\\Workspace\\tmpdb\\Data\\raw\\Via - Rider Accounts"
+filename = "Rider Account.xlsx"
+provider = "Via"
+use_cache = true
+
+
+[data.RideRequests]
+name = "RideRequests"
+desc = """N/A"""
+source_dir = "C:\\Workspace\\tmpdb\\Data\\raw\\Via - Ride Requests"
+filename = "*-Ride Requests*.xlsx"
+provider = "Via"
+use_cache = true
+
+
+[data.ViaS10]
+name = "ViaS10"
+desc = """N/A"""
+source_dir = "C:\\Workspace\\tmpdb\\Data\\raw\\Via - NTD S10"
+filename = "*.xlsx"
+provider = "Via"
+use_cache = true
