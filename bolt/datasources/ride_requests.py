@@ -4,7 +4,7 @@ import datetime as dt
 import pandas as pd
 from rich.console import Console
 
-from datasources import Datasource
+from . import Datasource
 
 
 console = Console()

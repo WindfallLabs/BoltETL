@@ -2,9 +2,8 @@
 import geopandas as gpd
 from rich.console import Console
 
-from datasources import Datasource
-from datasources.utils import cast_many, pyarrow_string, pyarrow_uint16
-
+from bolt.utils import cast_many, pyarrow_string, pyarrow_uint16
+from . import Datasource
 
 console = Console()
 
@@ -12,7 +11,7 @@ console = Console()
 class Parcels[T](Datasource):
     def __init__(self):
         self.table_name = "Parcels"
-        self.raw_path = r"raw\MSL - Missoula Parcels\Missoula_Parcels.gdb"
+        #self.raw_path = r"raw\MSL - Missoula Parcels\Missoula_Parcels.gdb"
         self.cache_path = "Parcels.feather"
         self.raw: gpd.GeoDataFrame|None = None
         self.data: gpd.GeoDataFrame|None = None

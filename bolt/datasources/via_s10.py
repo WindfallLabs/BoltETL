@@ -1,8 +1,8 @@
 """NTD S-10 report from Via"""
 import pandas as pd
 
-import servicedays as sd
-from datasources import Datasource, YearMonth
+from bolt.utils import servicedays as sd
+from . import Datasource, YearMonth
 
 
 class S10(Datasource):

@@ -4,7 +4,7 @@ from typing import Literal
 
 import pandas as pd
 
-from datasources import Datasource, YearMonth
+from . import Datasource, YearMonth
 
 
 class CR0174(Datasource):

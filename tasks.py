@@ -10,8 +10,8 @@ from pathlib import Path
 from invoke import task
 from rich.console import Console
 
-import reports
-from datasources import (
+import bolt
+from bolt.datasources import (
     CR0174,
     Datasource,
     DriverShifts,
@@ -24,7 +24,6 @@ from datasources import (
 
 
 console = Console()
-data_path = Path(r"C:\Workspace\tmpdb\Data")
 
 # How many days old to consider 'data_inventory.json' "stale"
 INVENTORY_STALE = 15
@@ -32,7 +31,7 @@ INVENTORY_STALE = 15
 
 def json_data_inventory() -> dict:
     """Gets contents of the Data folder as a dict/json."""    
-    files = [str(i).replace("\\", "/") for i in data_path.rglob("*.*")]
+    files = [str(i).replace("\\", "/") for i in bolt.config.data_path.rglob("*.*")]
     d = {
         "sha256": sha256(str(files).encode("UTF8")).hexdigest(),
         "last_update": dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -90,6 +89,15 @@ def check_inventory(c) -> None:
     return
 
 
+@task
+def update(c, datasource_name: str):
+    DS: Datasource = getattr(bolt.datasources, datasource_name)
+    ds = DS()
+    with console.status(f"Updating {datasource_name}..."):
+        ds.update()
+    return
+
+
 # ============================================================================
 # TESTS / DEBUGGING
 
@@ -128,7 +136,7 @@ def test_etl(c):
 def no_shows(c, start: str, end: str):
     """Runs the Para No-Show Report."""
     with console.status("ParaNoShows: Running Report..."):
-        rpt = reports.NoShowReport()
+        rpt = bolt.reports.NoShowReport()
         rpt.load_data()
         rpt.process(start, end)
         rpt.export()

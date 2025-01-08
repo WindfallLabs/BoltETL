@@ -2,7 +2,7 @@
 import pandas as pd
 from rich.console import Console
 
-from datasources import Datasource
+from . import Datasource
 
 
 console = Console()
@@ -12,7 +12,7 @@ class RiderAccounts(Datasource):
     def __init__(self):
         self.table_name = "RiderAccounts"
         self.raw_path = r"raw\Via - Rider Account\Rider Account.xlsx"
-        self.cache_path = "RiderAccount.feather"
+        self.cache_path = "RiderAccounts.feather"
         self.raw: pd.DataFrame|None = None
         self.data: pd.DataFrame|None = None
 

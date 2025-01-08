@@ -1,9 +1,21 @@
+# ============================================================================
 # Global Config Options
+[global]
 
-## The directory to read/write cached data
+# The directory to read/write data
+data_dir = "C:\\Workspace\\tmpdb\\Data"
+
+# The directory to read/write cached data
 cache_dir = "C:\\Workspace\\tmpdb\\Data\\cached"
 
+# The directory to write log files
+log_dir = "C:\\Workspace\\tmpdb\\.logs"
 
+# The path to the "data_inventory.json" file
+inv_path = "C:\\Workspace\\tmpdb\\Data\\data_inventory.json"
+
+
+# ============================================================================
 # Datasources
 ## See 'DataDefinitions.md' for documentation
 

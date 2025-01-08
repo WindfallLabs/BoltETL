@@ -40,6 +40,22 @@ To-Do:
 
 
 
+## [0.0.2] - 2025-01-08
+Added:
+- Created (empty) "/tests"
+- `log_dir` option in "config.toml" for log folder
+- `inv_path` option in "config.toml" for data inventory path
+
+Changed:
+- Moved "/datasources", "/reports", and "/utils" modules into new "/bolt" directory
+    - Updated imports
+    - (e.g. `import bolt`, `from bolt.datasources import Parcels`, etc.)
+- Moved "DataDefinitions.md" and "ProcessingGuide.md" into "/doc"
+- Moved "data_inventory.json" out of project
+
+Removed:
+- "/logs" directory (unused, better untracked alongside "/Data" and "/Reports")
+
 ## [0.0.1] - 2024-12-09
 
 _2025-01-03_

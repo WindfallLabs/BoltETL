@@ -7,7 +7,17 @@ _IMPORTANT: All filenames in the 'raw' folder should begin with a 6-digit 'yearm
 Login to virtual machine.
 
 Process:
-- 
+- Click "NTD by APCs"
+- Ensure that the "Find NTD Period" (top right) is correctly set
+- Choose the appropriate month under "Filter Surveys" (left)
+- Select "Month Report" under "Reports" (right)
+- Click "Run Report"
+- "OK" to the printer driver error
+- "Export" (top)
+- Ensure that the "XLSX" format is selected
+- Append the "yearmonth" to the "Destination File Name"
+    - e.g. "202412-NTD_MONTH_REPORT.XLSX"
+- Copy the output file from the Virtual Machine to the BoltETL Data folder
 
 
 ## CleverReports CR0174

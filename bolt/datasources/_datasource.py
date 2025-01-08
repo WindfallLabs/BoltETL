@@ -11,6 +11,8 @@ import pandas as pd
 import geopandas as gpd
 from sqlalchemy import Engine
 
+from bolt.utils import config, version
+
 
 class SourceType(Enum):
     FILE = "file"
@@ -18,7 +20,7 @@ class SourceType(Enum):
     URL = "url"
 
 
-class YearMonth:
+class YearMonth:  # TODO: move to utils
     def __init__(self, yearmonth: str|int):
         self.yearmonth = int(yearmonth)
         self.year = int(str(yearmonth)[:4])
@@ -40,8 +42,8 @@ class Datasource[T](ABC):
     """Abstract class defining Datasource classes.
     """
     # A single-point to change these base directories
-    DATA_DIR = r"C:\Workspace\tmpdb\Data"
-    CACHE_DIR = rf"{DATA_DIR}\cached"
+    #DATA_DIR = r"C:\Workspace\tmpdb\Data"
+    #CACHE_DIR = rf"{DATA_DIR}\cached"
 
     def __init__(self):
         self.table_name: Annotated[
@@ -75,33 +77,45 @@ class Datasource[T](ABC):
             if not getattr(self, _attr):
                 raise AttributeError(f"`{self.__class__.__name__}.{_attr}` not defined")
 
+    def load_config_data(self) -> None:
+        """Loads metadata from config (toml) file."""
+        self._cfg = config.data[self.__class__.__name__]
+        return
+
     @property
     def name(self):
         """Shortcut for class name."""
         return self.__class__.__name__
 
     @property
+    def version(self):
+        return version.from_file_mdate(self.cache_path)
+
+    @property
     def raw_path(self) -> str:
         """Return the path (string) to raw datasource."""
         return self._raw_path
     
-    @raw_path.setter
-    def raw_path(self, filepath: str):
-        """Set the path (string) to raw datasource."""
-        if self.DATA_DIR not in filepath:
-            self._raw_path = str(Path(self.DATA_DIR) / filepath)
-        else:
-            self._raw_path = filepath
+    #@raw_path.setter
+    #def raw_path(self, filepath: str):
+    #    """Set the path (string) to raw datasource."""
+    #    if self.DATA_DIR not in filepath:
+    #        self._raw_path = str(Path(self.DATA_DIR) / filepath)
+    #    else:
+    #        self._raw_path = filepath
 
     @property
     def cache_path(self) -> str:
         """Return the path (string) to cached data."""
-        return str(Path(self.CACHE_DIR).joinpath(self._cache_file))
+        #return str(Path(self.CACHE_DIR).joinpath(self._cache_file))
+        if cache.data[self.name].get("use_cache", True) is False:
+            raise IOError(f"Cache not enabled for {self.name}")
+        return str(config.cache_dir.joinpath(self.filename))
     
-    @cache_path.setter
-    def cache_path(self, filename: str):
-        """Set the path (string) to cached data."""
-        self._cache_file = filename
+    #@cache_path.setter
+    #def cache_path(self, filename: str):
+    #    """Set the path (string) to cached data."""
+    #    self._cache_file = filename
 
     @property
     def source_type(self) -> SourceType:

@@ -1,7 +1,7 @@
 """DriverShifts report from Via"""
 import pandas as pd
 
-from datasources import Datasource
+from . import Datasource
 
 
 class DriverShifts(Datasource):

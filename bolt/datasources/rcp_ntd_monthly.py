@@ -3,8 +3,8 @@ from math import ceil
 
 import pandas as pd
 
-import servicedays as sd
-from datasources import Datasource, YearMonth
+from bolt.utils import servicedays as sd
+from . import Datasource, YearMonth
 
 
 def to_int(s):
