@@ -1,4 +1,5 @@
 from ._datasource import Datasource
+from .county4 import County4
 from .cr0174 import CR0174
 from .drivershifts import DriverShifts
 from .parcels import Parcels
@@ -10,6 +11,7 @@ from .via_s10 import ViaS10
 
 __all__ = [
     Datasource,
+    County4,
     CR0174,
     DriverShifts,
     Parcels,

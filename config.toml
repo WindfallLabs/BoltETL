@@ -64,6 +64,16 @@ source_url = "https://ftpgeoinfo.msl.mt.gov/Data/Spatial/NonMSDI/Shapefiles/Town
 load_with_geopandas = true
 
 
+[metadata.County4]
+name = "County4"
+desc = "Missoula County Cadastral Data"
+provider = "Montana State Library"
+#driver = "ODBC+Driver+17+for+SQL+Server"
+#host = "localhost\\SQLEXPRESS"
+URI = "mssql+pyodbc://localhost\\SQLEXPRESS/County4?trusted_connection=yes&driver=ODBC+Driver+17+for+SQL+Server"
+
+
+
 [metadata.CR0174]
 name = "CR0174"
 #desc = """N/A"""

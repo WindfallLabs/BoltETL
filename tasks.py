@@ -11,6 +11,7 @@ from rich.console import Console
 
 import bolt
 from bolt.datasources import (
+    County4,
     CR0174,
     Datasource,
     DriverShifts,
@@ -23,6 +24,7 @@ from bolt.datasources import (
 
 
 DATASOURCES: list[Datasource] = [
+    County4,
     CR0174,
     DriverShifts,
     NTDMonthly,
