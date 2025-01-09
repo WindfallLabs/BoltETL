@@ -3,7 +3,7 @@ from math import ceil
 
 import pandas as pd
 
-from bolt.utils import servicedays as sd, to_float, to_int, YearMonth
+from bolt.utils import servicedays as sd, types, YearMonth
 from . import Datasource
 
 
@@ -35,7 +35,7 @@ class NTDMonthly(Datasource):
             "MTH_REV_HOURS",
             "MTH_PASS_MILES"
         ]
-        df[int_cols] = df[int_cols].map(to_int)
+        df[int_cols] = df[int_cols].map(types.to_int)
 
         float_cols = [
             "REV_MILES",
@@ -44,7 +44,7 @@ class NTDMonthly(Datasource):
             "AVG_TRIP_LEN",
             "FREQUENCY"
         ]
-        df[float_cols] = df[float_cols].map(to_float)
+        df[float_cols] = df[float_cols].map(types.to_float)
 
         # Additions
         df["YMTH"] = ymth.yearmonth

@@ -1,4 +1,4 @@
-"""Functions."""
+"""Type casting functions."""
 import geopandas as gpd
 import pandas as pd
 

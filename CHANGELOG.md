@@ -31,13 +31,19 @@ To-Do:
 - [ ] Schema (raw and final) dump-to-txt method; or dump to JSON
 
 
-### v0.2.0 Feature Checklist
-- [ ] MT DOR Database Conversion (MSSQL -> SQLite)
-
-
 ## v1.0.0 Feature Checklist
 - [ ] 95% Test Coverage
 
+
+## [0.0.3] - 2025-01-09
+- [ ] `Parcel.download` func
+- [ ] DOR Cadastral object
+- [ ] City Nhoods, Wards
+- [ ] MUTD Boundaries
+- [ ] House/Senate Districts
+
+Changed:
+- Cleaner types module
 
 
 ## [0.0.2] - 2025-01-08

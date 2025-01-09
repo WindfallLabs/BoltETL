@@ -1,7 +1,7 @@
 """Missoula County Parcel data from Montana State Library."""
 import geopandas as gpd
 
-from bolt.utils import CRS, cast_many, pyarrow_string, pyarrow_uint16
+from bolt.utils import CRS, types
 from . import Datasource
 
 
@@ -30,10 +30,10 @@ class Parcels(Datasource):
             col for col in df.columns
             if col != "geometry" and df[col].dtype.name == "object"
         ]
-        df = cast_many(df, str_cols, pyarrow_string)
+        df = types.cast_many(df, str_cols, types.pyarrow_string)
 
         # Set TaxYear to PyArrow uint
-        df["TaxYear"] = df["TaxYear"].astype(pyarrow_uint16)
+        df["TaxYear"] = df["TaxYear"].astype(types.pyarrow_uint16)
 
         # Remove non-ID'd parcels (e.g. rivers, lakes, etc.)
         df = df[~df["PARCELID"].isna()]
