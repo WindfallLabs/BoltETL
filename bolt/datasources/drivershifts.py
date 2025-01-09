@@ -1,39 +1,15 @@
 """DriverShifts report from Via"""
 import pandas as pd
 
+from bolt.utils import YearMonth
 from . import Datasource
 
 
 class DriverShifts(Datasource):
     def __init__(self):
-        self.table_name = "DriverShifts"
-        self.raw_path = r"raw\Via - Driver Shifts\*Driver Shifts*.xlsx"
-        self.cache_path = "DriverShifts.feather"
-        self.raw: tuple[str, pd.DataFrame]|None = None
-        self.data: pd.DataFrame|None = None
+        self.init()
 
-    def extract(self):
-        """Open each Excel file into a tuple of filepath-dataframe pairs."""
-        self.raw = [(p, pd.read_excel(p, dtype_backend="pyarrow")) for p in self.files]
-        return
-
-    def transform(self):
-        """Process each raw dataframe and concat."""
-        dfs = []
-        for fpath, df in self.raw:
-            dfs.append(self.process_one(fpath, df))
-        self.data = pd.concat(dfs).reset_index(drop=True)
-        return
-
-    def validate(self):
-        return  # TODO:
-
-    def load(self, database):
-        self.df.to_sql(self.name, database.engine)
-        return
-
-    def process_one(self, filepath: str, df: pd.DataFrame) -> pd.DataFrame:
-    #def process_driver_shifts(filepath: str):
+    def transform_one(self, filepath: str, df: pd.DataFrame) -> pd.DataFrame:
         """Processes Driver Shifts from VOC."""
         shift_date_cols = [
             "Date",
@@ -44,7 +20,7 @@ class DriverShifts(Datasource):
         ]
 
         df = df.copy()
-        yearmonth: int = self.get_yearmonth(filepath)
+        yearmonth: int = YearMonth.from_filepath(filepath)
         # Parse dates
         df[shift_date_cols] = df[shift_date_cols].map(pd.to_datetime)
         # Rename existing 'Service' field to 'Service Type'
@@ -81,3 +57,11 @@ class DriverShifts(Datasource):
         # TODO: narrow down which columns are useful and limit to only those; then update the SQL file.
 
         return df
+
+    def transform(self):
+        """Process each raw dataframe and concat."""
+        dfs = []
+        for fpath, df in self.raw:
+            dfs.append(self.transform_one(fpath, df))
+        self.data = pd.concat(dfs).reset_index(drop=True)
+        return

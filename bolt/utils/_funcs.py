@@ -35,3 +35,14 @@ def cast_ints(df: pd.DataFrame|gpd.GeoDataFrame) -> pd.DataFrame|gpd.GeoDataFram
         except Exception:
             continue
 '''
+
+def to_int(s):
+    if isinstance(s, str):
+        return int(s.replace(",", ""))
+    return s
+
+
+def to_float(s):
+    if isinstance(s, str):
+        return float(s.replace(",", ""))
+    return s

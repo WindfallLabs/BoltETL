@@ -4,40 +4,15 @@ from typing import Literal
 
 import pandas as pd
 
-from . import Datasource, YearMonth
+from bolt.utils import YearMonth
+from . import Datasource
 
 
 class CR0174(Datasource):
     def __init__(self):
-        self.table_name = "CR0174"
-        self.raw_path = r"raw\CR - CR0174\*CR-0174*.csv"
-        self.cache_path = "CR-0174.feather"
-        # Define datatype for raw data
-        self.raw: tuple[str, pd.DataFrame]|None = None
-        self.data: pd.DataFrame|None = None
-        #super().__init__()  # TODO: this would avoid defining self.data
+        self.init()
 
-    def extract(self):
-        """Open each csv file into a tuple of filepath-dataframe pairs."""
-        self.raw = [(p, pd.read_csv(p, dtype_backend="pyarrow")) for p in self.files]
-        return
-
-    def transform(self):
-        """Process each raw dataframe and concat."""
-        dfs = []
-        for fpath, df in self.raw:
-            dfs.append(self.process_one(fpath, df))
-        self.data = pd.concat(dfs).reset_index(drop=True)
-        return
-
-    def validate(self):
-        return  # TODO:
-
-    def load(self, database):
-        self.df.to_sql(self.name, database.engine)
-        return
-
-    def process_one(self, filepath: str, raw_df: pd.DataFrame) -> pd.DataFrame:
+    def transform_one(self, filepath: str, raw_df: pd.DataFrame) -> pd.DataFrame:
         """Processes a raw CR-0174 report (DataFrame)."""
         df = raw_df.copy()
         #yearmonth: int = int(re.findall(r"^\d{6}", filepath.split("\\")[-1])[0])
@@ -79,3 +54,11 @@ class CR0174(Datasource):
                 continue
             df[col] = df[col].astype(str).str.replace(",", "").astype(float)
         return df
+
+    def transform(self):
+        """Process each raw dataframe and concat."""
+        dfs = []
+        for fpath, df in self.raw:
+            dfs.append(self.transform_one(fpath, df))
+        self.data = pd.concat(dfs).reset_index(drop=True)
+        return

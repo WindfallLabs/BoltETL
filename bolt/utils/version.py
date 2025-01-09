@@ -1,6 +1,6 @@
 import datetime as dt
 import os
-from packaging.version import parse as parse_version, Version
+from packaging.version import Version  # parse as parse_version
 
 
 def from_file_mdate(fpath: str) -> Version:

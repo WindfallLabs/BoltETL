@@ -1,10 +1,7 @@
 """Datasource ABC."""
-import re
 from abc import ABC, abstractmethod
-from enum import Enum
-from glob import glob
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated
 from typing_extensions import Doc
 
 import pandas as pd
@@ -14,72 +11,39 @@ from sqlalchemy import Engine
 from bolt.utils import config, version
 
 
-class SourceType(Enum):
-    FILE = "file"
-    FILES = "files"
-    URL = "url"
+SUPPORTED_CACHE_TYPES = ("DISABLE", "feather")
 
-
-class YearMonth:  # TODO: move to utils
-    def __init__(self, yearmonth: str|int):
-        self.yearmonth = int(yearmonth)
-        self.year = int(str(yearmonth)[:4])
-        self.month = int(str(yearmonth)[4:])
-
-    @classmethod
-    def from_filepath(cls, filepath: str|Path):
-        ymth = re.findall(r"^\d{6}", Path(filepath).name)[0]
-        return YearMonth(ymth)
-
-    def __repr__(self):
-        return "<YearMonth: {self.yearmonth}>"
-
-    def __str__(self):
-        return str(self.yearmonth)
+READERS = {
+    "xlsx": pd.read_excel,
+    "csv": pd.read_csv,
+    # TODO: more filetype readers?
+}
 
 
 class Datasource[T](ABC):
-    """Abstract class defining Datasource classes.
-    """
-    # A single-point to change these base directories
-    #DATA_DIR = r"C:\Workspace\tmpdb\Data"
-    #CACHE_DIR = rf"{DATA_DIR}\cached"
-
+    """Abstract class defining Datasource classes."""
     def __init__(self):
-        self.table_name: Annotated[
-            str,
-            Doc("The name of the output database table")
-            ] = ""
-
-        self._raw_path: Annotated[
-            str|None,
-            Doc("Contains the full path to the raw datasource")
-         ] = None
-
-        self._cache_file: Annotated[
-            str|None,
-            Doc("Contains the filename of the cached data")
-        ] = None
+        self.metadata: Annotated[
+            dict,  # TODO: dict template / typing?
+            Doc("Data definition / metadata loaded from 'config.toml'")
+        ]
 
         self.raw: Annotated[
-            Any,
-            Doc("DataFrame of raw data (created by `extract`)")
+            list[tuple[str, pd.DataFrame|gpd.GeoDataFrame]] | None,
+            Doc("DataFrame of GeoDataFrame of raw data (created by `extract`)")
         ] = None
 
         self.data: Annotated[
             pd.DataFrame|gpd.GeoDataFrame|None,
-            Doc("DataFrame of processed data (created by `transform` or loaded from file with `load`)")
+            Doc("DataFrame or GeoDataFrame of processed data (created by `transform` or loaded from cache with `read_cache`)")
         ] = None
 
-        # Check for required attributes
-        _req_attrs = ["table_name", "raw_path"]
-        for _attr in _req_attrs:
-            if not getattr(self, _attr):
-                raise AttributeError(f"`{self.__class__.__name__}.{_attr}` not defined")
-
-    def load_config_data(self) -> None:
+    def init(self) -> None:
         """Loads metadata from config (toml) file."""
-        self._cfg = config.data[self.__class__.__name__]
+        try:
+            self.metadata = config.metadata[self.__class__.__name__]
+        except KeyError:
+            raise KeyError(f"Name mismatch: '{self.name}' not in config.toml")
         return
 
     @property
@@ -92,51 +56,33 @@ class Datasource[T](ABC):
         return version.from_file_mdate(self.cache_path)
 
     @property
-    def raw_path(self) -> str:
-        """Return the path (string) to raw datasource."""
-        return self._raw_path
-    
-    #@raw_path.setter
-    #def raw_path(self, filepath: str):
-    #    """Set the path (string) to raw datasource."""
-    #    if self.DATA_DIR not in filepath:
-    #        self._raw_path = str(Path(self.DATA_DIR) / filepath)
-    #    else:
-    #        self._raw_path = filepath
+    def source_files(self) -> list[str]:
+        return [
+            str(p.absolute()) for p
+            in Path(self.metadata["source_dir"]).rglob(self.metadata["filename"])
+            # Ignore source / raw files that start with "_"
+            if not p.name.startswith("_")
+        ]
 
     @property
-    def cache_path(self) -> str:
-        """Return the path (string) to cached data."""
-        #return str(Path(self.CACHE_DIR).joinpath(self._cache_file))
-        if cache.data[self.name].get("use_cache", True) is False:
-            raise IOError(f"Cache not enabled for {self.name}")
-        return str(config.cache_dir.joinpath(self.filename))
-    
-    #@cache_path.setter
-    #def cache_path(self, filename: str):
-    #    """Set the path (string) to cached data."""
-    #    self._cache_file = filename
+    def cache_path(self) -> Path:
+        """Return the path (string) to cached data file."""
+        cache_filetype = self.metadata.get("cache_filetype", "feather")  # TODO: DOCUMENT that caching to .feather is default
+        if cache_filetype not in SUPPORTED_CACHE_TYPES:
+            raise TypeError(f"'{cache_filetype}' file type not (yet) supported")
+        if cache_filetype == "DISABLE":
+            raise IOError(f"Caching is disabled for '{self.name}'")
+        return config.cache_dir.joinpath(f'{self.metadata["name"]}.{cache_filetype}')
 
-    @property
-    def source_type(self) -> SourceType:
-        if self.raw_path.startswith("http"):
-            return SourceType.URL
-        if isinstance(self.raw_path, Path) and self.raw_path.exists():
-            return SourceType.FILE
-        if "*" in self.raw_path:
-            return SourceType.FILES
-        return None
-
-    @property
-    def files(self):
-        if self.source_type == SourceType.FILES:
-            return glob(self.raw_path)
-        raise NotImplementedError(f"{self.source_type} has no `.file` property")
-
-    @abstractmethod
-    def extract(self) -> None:
-        """Defines how the source/raw data is read into `self.raw` DataFrame."""
-        self.raw = ...
+    def extract(self):
+        """Open the raw data source file(s). Can be over-written to customize."""
+        ext = self.metadata["filename"].split(".")[-1].lower()
+        if self.metadata.get("load_with_geopandas", False):
+            # TODO: would we ever read multiple?
+            self.raw = gpd.read_file(self.source_files[0], layer=self.metadata.get("layer", 0))
+        else:
+            read_func = READERS[ext]
+            self.raw = [(p, read_func(p, dtype_backend="pyarrow")) for p in self.source_files]
         return
 
     @abstractmethod
@@ -146,21 +92,23 @@ class Datasource[T](ABC):
         # self.data = df
         return
 
-    @abstractmethod
-    def load(self, dst: Engine, *args, **kwargs):
-        """Define how the the processed data is loaded into a target database."""
-        self.data.to_sql(self.table_name, dst, *args, **kwargs)
+    def load(self, dst: Engine, *args, **kwargs):  # TODO: what is this good for?
+        """Defines how the the processed data is loaded into a target database."""
+        self.data.to_sql(self.name, dst, *args, **kwargs)
         return
 
-    def write_cache(self, *args, **kwargs) -> None:
-        """Optionally define how to cache processed data."""
+    def write_cache(self, *args, **kwargs) -> None:  # TODO: support for filetypes other than feather?
+        """How to cache processed data."""
         self.data.to_feather(self.cache_path, *args, **kwargs)
         return
 
-    def read_cache(self, *args, **kwargs) -> T:
-        """Optionally define how to load cached data into `self.data` DataFrame."""
-        self.data = pd.read_feather(self.cache_path, *args, **kwargs, dtype_backend="pyarrow")
-        return self
+    def read_cache(self, *args, **kwargs) -> None:  # TODO: support for filetypes other than feather?
+        """Loads data attribute from cache file."""
+        if self.metadata.get("load_with_geopandas", False):
+            self.data = gpd.read_feather(self.cache_path, *args, **kwargs)  # TODO: convert columns to pyarrow types?
+        else:
+            self.data = pd.read_feather(self.cache_path, *args, **kwargs, dtype_backend="pyarrow")
+        return
 
     def validate(self):
         """Describe the rules that the data must adhere to before exported via `load`."""
@@ -168,43 +116,9 @@ class Datasource[T](ABC):
 
     def update(self):
         """Convenience method to combine Extract, Transform, and Cache methods."""
+        if hasattr(self, "download"):
+            self.download(self.metadata["download_path"])  # TODO: WIP
         self.extract()
         self.transform()
         self.write_cache()
         return
-
-
-    # ========================================================================
-    # Helper functions
-    # ========================================================================
-
-    #@staticmethod
-    #def get_yearmonth(filepath: str) -> int:
-    #    """Parse a filename for a YYYYMM 'yearmonth' (e.g. 202412).
-    #    
-    #    NOTE: A yearmonth should be the first 6 digits of all filenames.
-    #    """
-    #    #return int(re.findall(r"^\d{6}", filepath.split("\\")[-1])[0])
-    #    return YearMonth.from_filepath(filepath)
-
-    @staticmethod
-    def get_number_of_days(yearmonth, day) -> int:
-        """Counts the number of the given day for the given yearmonth."""
-        ...
-
-
-
-'''
-db = DevDB()
-db.add_report(ElectrificationReport)
-db.add_datasource(drivershifts)
-db.load_all()
-
-
-class FutureResult():
-    def __init__(self, table_name):
-        pass
-
-
-derived_data = FutureResult("future_table")
-'''

@@ -3,52 +3,15 @@ from math import ceil
 
 import pandas as pd
 
-from bolt.utils import servicedays as sd
-from . import Datasource, YearMonth
-
-
-def to_int(s):
-    if isinstance(s, str):
-        return int(s.replace(",", ""))
-    return s
-
-
-def to_float(s):
-    if isinstance(s, str):
-        return float(s.replace(",", ""))
-    return s
+from bolt.utils import servicedays as sd, to_float, to_int, YearMonth
+from . import Datasource
 
 
 class NTDMonthly(Datasource):
     def __init__(self):
-        self.table_name = "RCPMonthlyNTD"
-        self.raw_path = r"raw\RCP - NTD Month Report\*-NTD_MONTH_REPORT.XLSX"
-        self.cache_path = "RCPMonthlyNTD.feather"
-        # Define datatype for raw data
-        self.raw: tuple[str, pd.DataFrame]|None = None
-        self.data: pd.DataFrame|None = None
+        self.init()
 
-    def extract(self):
-        """Open each Excel file into a tuple of filepath-dataframe pairs."""
-        self.raw = [(p, pd.read_excel(p, dtype_backend="pyarrow")) for p in self.files]
-        return
-
-    def transform(self):
-        """Process each raw dataframe and concat."""
-        dfs = []
-        for fpath, df in self.raw:
-            dfs.append(self.process_one(fpath, df))
-        self.data = pd.concat(dfs).reset_index(drop=True)
-        return
-
-    def validate(self):
-        return  # TODO:
-
-    def load(self, database):
-        self.df.to_sql(self.name, database.engine)
-        return
-
-    def process_one(self, filepath: str, raw_df: pd.DataFrame) -> pd.DataFrame:
+    def transform_one(self, filepath: str, raw_df: pd.DataFrame) -> pd.DataFrame:
         """Processes the NTD_MONTHLY_REPORT from Ridecheck+."""
         df = raw_df.copy()
         ymth = YearMonth.from_filepath(filepath)
@@ -122,3 +85,11 @@ class NTDMonthly(Datasource):
         df.loc[df["Service"] == "Sunday", "Avg Daily Ridership"] = sun_avg_ridership
 
         return df
+
+    def transform(self):
+        """Process each raw dataframe and concat."""
+        dfs = []
+        for fpath, df in self.raw:
+            dfs.append(self.transform_one(fpath, df))
+        self.data = pd.concat(dfs).reset_index(drop=True)
+        return

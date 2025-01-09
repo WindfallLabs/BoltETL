@@ -5,7 +5,6 @@ For now... might migrate to click.
 import datetime as dt
 import json
 from hashlib import sha256
-from pathlib import Path
 
 from invoke import task
 from rich.console import Console
@@ -19,9 +18,19 @@ from bolt.datasources import (
     Parcels,
     RiderAccounts,
     RideRequests,
-    S10,
+    ViaS10,
 )
 
+
+DATASOURCES: list[Datasource] = [
+    CR0174,
+    DriverShifts,
+    NTDMonthly,
+    Parcels,
+    RiderAccounts,
+    RideRequests,
+    ViaS10,
+]
 
 console = Console()
 
@@ -104,16 +113,8 @@ def update(c, datasource_name: str):
 @task
 def test_etl(c):
     errors: list[tuple[str, Exception]] = []
-    datasources: list[Datasource] = [
-        CR0174,
-        DriverShifts,
-        NTDMonthly,
-        Parcels,
-        RiderAccounts,
-        RideRequests,
-        S10,
-    ]
-    for D in datasources:
+
+    for D in DATASOURCES:
         d = D()
         console.print(f"Testing {d.name}...")
         try:

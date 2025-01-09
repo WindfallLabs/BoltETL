@@ -1,45 +1,15 @@
 """NTD S-10 report from Via"""
 import pandas as pd
 
-from bolt.utils import servicedays as sd
-from . import Datasource, YearMonth
+from bolt.utils import servicedays as sd, YearMonth
+from . import Datasource
 
 
-class S10(Datasource):
+class ViaS10(Datasource):
     def __init__(self):
-        self.table_name = "ViaS10"
-        self.raw_path = r"raw\Via - NTD S10\*.xlsx"
-        self.cache_path = "ViaS10.feather"
-        self.raw: tuple[str, pd.DataFrame]
-        self.data: pd.DataFrame|None = None
+        self.init()
 
-    def extract(self):
-        """Open each Excel file into a tuple of filepath-dataframe pairs."""
-        self.raw = [(p, pd.read_excel(p, dtype_backend="pyarrow")) for p in self.files
-                    if not p.split("\\")[-1].startswith("_")]
-        return
-
-    def transform(self):
-        """Process each raw dataframe and concat."""
-        dfs = []
-        for fpath, df in self.raw:
-            try:
-                processed_df: pd.DataFrame = self.process_one(fpath, df)
-            except Exception as e:
-                print(f"Failed to process: {fpath}")
-                raise e
-            dfs.append(processed_df)
-        self.data = pd.concat(dfs)
-        return
-
-    def validate(self):
-        return  # TODO:
-
-    def load(self, database):
-        self.df.to_sql(self.name, database.engine)
-        return
-
-    def process_one(self, filepath: str, raw_df: pd.DataFrame) -> pd.DataFrame:
+    def transform_one(self, filepath: str, raw_df: pd.DataFrame) -> pd.DataFrame:
         df = raw_df.copy()
         # Add yearmonth
         ymth: YearMonth = YearMonth.from_filepath(filepath)
@@ -120,3 +90,15 @@ class S10(Datasource):
         df = df.reset_index(drop=True)
         return df
 
+    def transform(self):
+        """Process each raw dataframe and concat."""
+        dfs = []
+        for fpath, df in self.raw:
+            try:
+                processed_df: pd.DataFrame = self.transform_one(fpath, df)
+            except Exception as e:
+                print(f"Failed to process: {fpath}")
+                raise e
+            dfs.append(processed_df)
+        self.data = pd.concat(dfs)
+        return

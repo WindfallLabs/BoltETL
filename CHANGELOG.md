@@ -42,19 +42,24 @@ To-Do:
 
 ## [0.0.2] - 2025-01-08
 Added:
-- Created (empty) "/tests"
 - `log_dir` option in "config.toml" for log folder
-- `inv_path` option in "config.toml" for data inventory path
 
 Changed:
-- Moved "/datasources", "/reports", and "/utils" modules into new "/bolt" directory
-    - Updated imports
-    - (e.g. `import bolt`, `from bolt.datasources import Parcels`, etc.)
-- Moved "DataDefinitions.md" and "ProcessingGuide.md" into "/doc"
-- Moved "data_inventory.json" out of project
+- Refactored 'metadata' from datasource class definition into (centralized) config.toml
+- Codebase ("/datasources", "/reports", and "/utils" modules) are now under "/bolt"
+    - e.g. `import bolt` is now a thing
+- All `raw` datasource properties are now `list[tuple[str, pd.DataFrame|gpd.GeoDataFrame]]`
+- Misc file organization
+    - Created (empty) "/tests" folder
+    - Moved "DataDefinitions.md" and "ProcessingGuide.md" into "/doc"
+    - Moved "data_inventory.json" out of project; added "inv_path" config value
+    - Moved `YearMonth` class, and `to_float` and `to_int` funcs to utils
 
 Removed:
-- "/logs" directory (unused, better untracked alongside "/Data" and "/Reports")
+- "/logs" directory (unused, better untracked alongside external "/Data" and "/Reports")
+- Datasource classes no longer print to `rich.Console`
+- Large decrease of codebase!
+
 
 ## [0.0.1] - 2024-12-09
 
