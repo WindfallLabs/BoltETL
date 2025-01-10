@@ -36,14 +36,15 @@ To-Do:
 
 
 ## [0.0.3] - 2025-01-09
-- [ ] `Parcel.download` func
 - [ ] City Nhoods, Wards
 - [ ] MUTD Boundaries
 - [ ] House/Senate Districts
+- [ ] Logging
 
 Added:
 - Mt DOR Cadastral `County4` object
     - Currently requires external "oriondb" code and update procedure
+- `download` method on Parcels
 
 Changed:
 - Cleaner types module

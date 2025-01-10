@@ -24,14 +24,14 @@ from bolt.datasources import (
 
 
 DATASOURCES: list[Datasource] = [
-    County4,
+    #County4,
     CR0174,
     DriverShifts,
-    NTDMonthly,
-    Parcels,
-    RiderAccounts,
-    RideRequests,
-    ViaS10,
+    #NTDMonthly,
+    #Parcels,
+    #RiderAccounts,
+    #RideRequests,
+    #ViaS10,
 ]
 
 console = Console()
@@ -101,27 +101,24 @@ def check_inventory(c) -> None:
 
 
 @task
-def update(c, datasource_name: str):
-    DS: Datasource = getattr(bolt.datasources, datasource_name)
-    ds = DS()
-    with console.status(f"Updating {datasource_name}..."):
-        ds.update()
-    return
-
-
-# ============================================================================
-# TESTS / DEBUGGING
-
-@task
-def test_etl(c):
+def update(c, datasource: str="all", cache: int=1):  # TODO: flag to cache data
+    datasources: list[Datasource] = (
+        [getattr(bolt.datasources, datasource)] if datasource not in ("all", "*")
+        else DATASOURCES
+    )
     errors: list[tuple[str, Exception]] = []
-
-    for D in DATASOURCES:
+    if cache:
+        console.print("Updating:")
+    else:
+        console.print("Testing:")
+    for D in datasources:
         d = D()
-        console.print(f"Testing {d.name}...")
+        console.print(f"  {d.name}...")
         try:
             d.extract()
             d.transform()
+            if cache:
+                d.write_cache()
         except Exception as e:
             errors.append((d.name, e))
 
@@ -144,3 +141,8 @@ def no_shows(c, start: str, end: str):
         rpt.process(start, end)
         rpt.export()
     return
+
+
+@task  # WIP
+def ntd_monthly(c, yearmonth: str):
+    yearmonth: int = int(yearmonth)

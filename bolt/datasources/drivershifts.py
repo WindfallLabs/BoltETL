@@ -1,7 +1,7 @@
 """DriverShifts report from Via"""
 import pandas as pd
 
-from bolt.utils import YearMonth
+from bolt.utils import YearMonth, types
 from . import Datasource
 
 
@@ -20,9 +20,12 @@ class DriverShifts(Datasource):
         ]
 
         df = df.copy()
-        yearmonth: int = YearMonth.from_filepath(filepath)
+        yearmonth: int = YearMonth.from_filepath(filepath).yearmonth
         # Parse dates
         df[shift_date_cols] = df[shift_date_cols].map(pd.to_datetime)
+        # Cast types
+        df["Plate Number"] = df["Plate Number"].astype(types.pyarrow_string)
+
         # Rename existing 'Service' field to 'Service Type'
         df.rename({"Service": "Service Type"}, axis=1, inplace=True)
 

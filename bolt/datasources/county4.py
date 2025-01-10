@@ -1,10 +1,9 @@
 """Missoula County Cadastral data from Montana State Library."""
-import geopandas as gpd
 import pandas as pd
 from pathlib import Path
 from sqlalchemy import Engine, create_engine
 
-from bolt.utils import config, types
+from bolt.utils import config
 from . import Datasource
 
 
@@ -15,9 +14,9 @@ TBL_SQL = """
 """
 
 IGNORE_TBLS =  {
-    'geometry_columns',
-    'parcels',
-    'spatial_ref_sys'
+    "geometry_columns",
+    "parcels",
+    "spatial_ref_sys"
 }
 
 

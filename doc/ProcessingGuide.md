@@ -6,7 +6,7 @@ _IMPORTANT: All filenames in the 'raw' folder should begin with a 6-digit 'yearm
 ## RideCheck+ (a.k.a. "RCP" or "RC+") 
 Login to virtual machine.
 
-Process:
+Download Process:
 - Click "NTD by APCs"
 - Ensure that the "Find NTD Period" (top right) is correctly set
 - Choose the appropriate month under "Filter Surveys" (left)
@@ -19,6 +19,14 @@ Process:
     - e.g. "202412-NTD_MONTH_REPORT.XLSX"
 - Copy the output file from the Virtual Machine to the BoltETL Data folder
 
+BoltELT Update Process:
+- Open a cmd shell
+- Set the "uv" environment with:
+    - `cd %PYTHON%`
+    - `env py13`
+- Then change directories to the BoltETL directory and run the update task
+    - `cd %BOLT%`
+    - `invoke 
 
 ## CleverReports CR0174
 [Web Interface](http://10.235.25.14:8888/logon.i4)  

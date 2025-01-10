@@ -41,7 +41,11 @@ class Datasource[T](ABC):
     def init(self) -> None:
         """Loads metadata from config (toml) file."""
         try:
-            self.metadata = config.metadata[self.__class__.__name__]
+            # TODO: consider pydantic for validation and type casting
+            self.metadata = {
+                k: Path(v) if "_dir" in k or "_path" in k else v
+                for k, v in config.metadata[self.__class__.__name__].items()
+            }
         except KeyError:
             raise KeyError(f"Name mismatch: '{self.name}' not in config.toml")
         return
@@ -72,6 +76,7 @@ class Datasource[T](ABC):
             raise TypeError(f"'{cache_filetype}' file type not (yet) supported")
         if cache_filetype == "DISABLE":
             raise IOError(f"Caching is disabled for '{self.name}'")
+        # Default
         return config.cache_dir.joinpath(f'{self.metadata["name"]}.{cache_filetype}')
 
     def extract(self):

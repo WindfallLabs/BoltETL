@@ -1,7 +1,7 @@
 """Missoula County Parcel data from Montana State Library."""
 import geopandas as gpd
 
-from bolt.utils import CRS, types
+from bolt.utils import CRS, download, types
 from . import Datasource
 
 
@@ -9,8 +9,14 @@ class Parcels(Datasource):
     def __init__(self):
         self.init()
 
+    def download(self):
+        """Download and overwrite existing Missoula County parcel data."""
+        #target_file = self.metadata["source_dir"].joinpath(self.metadata["filename"])
+        download(self.metadata["source_url"], self.metadata["source_dir"])
+        return
+
     def transform(self):
-        """."""
+        """Process parcel data."""
         drop_columns = [
             "COUNTYCD",
             "CountyName",
