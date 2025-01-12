@@ -24,14 +24,16 @@ from bolt.datasources import (
 
 
 DATASOURCES: list[Datasource] = [
-    #County4,
+    # TODO: get from bolt.config?
+    # [locals()[ds] for ds in bolt.config.metadata.keys()]
+    County4,
     CR0174,
     DriverShifts,
-    #NTDMonthly,
-    #Parcels,
-    #RiderAccounts,
-    #RideRequests,
-    #ViaS10,
+    NTDMonthly,
+    Parcels,
+    RiderAccounts,
+    RideRequests,
+    ViaS10,
 ]
 
 console = Console()

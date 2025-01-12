@@ -9,12 +9,12 @@ config = Config()
 CRS = config.crs
 
 __all__ = [
-    CRS,
-    config,
-    CONFIG_PATH,
-    download,
-    types,
+    "CRS",
+    "config",
+    "CONFIG_PATH",
+    "download",
+    "types",
     # ...
-    version,
-    YearMonth
+    "version",
+    "YearMonth"
 ]

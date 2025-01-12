@@ -1,39 +1,40 @@
 # BoltETL
 _Author: Garin Wally; 2024-12-09_
+_Developed with love and support from the Missoula Urban Transit District_
 
-## Mission
-> _To best optimize our data infrastructure, automate common data manipulation and reporting functions, and set standardized procedures for cataloging, documenting, and stewarding datasets._
+BoltETL is a data-processing utility and [ETL](https://en.wikipedia.org/wiki/Extract,_transform,_load) framework intended for solo data analysts and small teams. Built with [pandas](https://pandas.pydata.org/) and Python (one of the world's [most popular](https://spectrum.ieee.org/top-programming-languages-2024) programming languages).
 
-## Basics
-"BoltETL" (Extract, Transform, Load) is, in essence, a command line utility intended to assist in data processing pipelines and reporting. It does this by using Python classes to wrap data and their [ETL](https://en.wikipedia.org/wiki/Extract,_transform,_load) procedures which can be imported and manipulated in a modular, standardized, documented, and intuitive manner.
+Transform diverse data sources into standardized, Pythonic objects through custom `Datasource` classes and a simple [TOML](https://toml.io/en/) configuration file - whether you're working with Excel reports, CSV files, or spatial data; and define exactly how your data is retrieved, updated, validated, and exported. Leverage high-performance caching to/from the "feather" filetype for both spatial and non-spatial data. Enjoy the simplicity of running your data-tasks using a well-documented-and dead-simple command line utility. No containers, no web servers, no enterprise infrastructure, just Python.
 
+BoltETL is:
+- Flexible, single-tool data solution
+- Highly customizable
+- Scalable for any quantity or complexity
+- Free and Open Source
+- Supports tabular and spatial data (using [geopandas](https://geopandas.org/en/stable/getting_started/introduction.html))
+- Adaptable to your unique data challenges
 
-The goals of this project are to:
-- Catalog and organize datasets used by MUTD
-- Encapsulte ETL processes within modular Datasource objects
-    - Automate, when possible, the retrieval of data (from static URLs, etc.)
-    - Codify and automate data transformations
-- Utilize fast read/write functionality (e.g. PyArrow)
-- Cache transformed data (e.g. Feather) to avoid unnecessarily reprocessing datasets
-- Encapsulate lists of data used in various reports as Report objects.
-- Track when data was last updated
-
-
-## Python Packages (WIP)
-MAYBE BoltETL provides _multiple_ Python modules:
-- `datasources`
-    - e.g. `from datasources import S10`
-
-- `reports`
-- `utils`
+BoltETL is _not_:
+- A replacement for enterprise data pipelining
+- An out-of-the-box solution
 
 
-## Use (WIP)
+## Installation and Setup (WIP)
+If you are unfamiliar with `git`, download this repository from the "Releases" page.
+...
+
+
+## Getting Started (WIP)
+...
+
+
+## Reports (WIP)
 
 ```cmd
 invoke no-shows 2024-01-01 2024-01-31
 
 ```
+
 
 ## Example and Explanation (WIP)
 A `datasource` is a Python class that encapsulates:

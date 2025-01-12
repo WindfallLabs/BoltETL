@@ -5,8 +5,8 @@ from .utils import config  # provide a shortcut accessor
 
 
 __all__ = [
-    config,
-    datasources,
-    reports,
-    utils
+    "config",
+    "datasources",
+    "reports",
+    "utils"
 ]
