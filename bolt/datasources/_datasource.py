@@ -1,11 +1,15 @@
 """Datasource ABC."""
+import datetime as dt
 from abc import ABC, abstractmethod
+from getpass import getuser
 from pathlib import Path
+from platform import node
 from typing import Annotated
 from typing_extensions import Doc
 
 import pandas as pd
 import geopandas as gpd
+from pydantic import BaseModel
 from sqlalchemy import Engine
 
 from bolt.utils import config, version
@@ -18,6 +22,17 @@ READERS = {
     "csv": pd.read_csv,
     # TODO: more filetype readers?
 }
+
+
+class CacheMetaData(BaseModel):
+    filename: str
+    export_date: str
+    processed_by: str
+    #log_path: str
+    #log_md5: str
+    datasource_version: str
+    #datasource_md5: str
+    sources: list[str]
 
 
 class Datasource[T](ABC):
@@ -105,7 +120,23 @@ class Datasource[T](ABC):
     def write_cache(self, *args, **kwargs) -> None:  # TODO: support for filetypes other than feather?
         """How to cache processed data."""
         self.data.to_feather(self.cache_path, *args, **kwargs)
+
+        # TODO: dump cache metadata
+        #self.cache_metadata().dump()...
         return
+
+    def cache_metadata(self):
+        cmeta = CacheMetaData(
+            filename="{self.name}.feather",
+            export_date=dt.datetime.now().strftime("%Y-%m-%d"),
+            processed_by=f"{getuser()}/{node()}",
+            #log_path=self.log.path,
+            #log_md5=hashfile(self.log.path),
+            datasource_version=str(self.version),  # TODO: wip
+            #datasource_md5=hashfile(Path(__file__).absolute()),
+            sources=sorted(self.source_files, reverse=True)
+        )
+        return cmeta
 
     def read_cache(self, *args, **kwargs) -> None:  # TODO: support for filetypes other than feather?
         """Loads data attribute from cache file."""
@@ -113,6 +144,9 @@ class Datasource[T](ABC):
             self.data = gpd.read_feather(self.cache_path, *args, **kwargs)  # TODO: convert columns to pyarrow types?
         else:
             self.data = pd.read_feather(self.cache_path, *args, **kwargs, dtype_backend="pyarrow")
+        
+        # Load cache metadata
+        # TODO: json.load(.../cached/.metadata/{filename}) -> bolt.config.metadata[filename]
         return
 
     def validate(self):
