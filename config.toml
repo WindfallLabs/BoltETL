@@ -5,6 +5,9 @@
 # The directory to read/write data
 data_dir = "C:\\Workspace\\tmpdb\\Data"
 
+# The directory to load SQL files (views)
+sql_dir = "C:\\Workspace\\tmpdb\\.BoltETL\\bolt\\reports\\sql"
+
 # The directory to read/write cached data
 cache_dir = "C:\\Workspace\\tmpdb\\Data\\cached"
 

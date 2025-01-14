@@ -29,6 +29,7 @@ To-Do:
 - [ ] Populated `load` methods?
 - [ ] Match RCP and Via NTD schemas
 - [ ] Schema (raw and final) dump-to-txt method; or dump to JSON
+- [ ] Ditch `invoke` and replace with `click`
 
 
 ## v1.0.0 Feature Checklist
@@ -45,6 +46,11 @@ Added:
 - Mt DOR Cadastral `County4` object
     - Currently requires external "oriondb" code and update procedure
 - `download` method on Parcels
+- CR0174 all raw files; complete history back to 2023-01
+- Began development of a DuckDB data warehouse
+- Began development of data-file tracking (git-like 'status' and 'add' commands)
+- SQL files for NTD monthly ridership reporting in "/reports/sql"
+
 
 Changed:
 - Cleaner types module

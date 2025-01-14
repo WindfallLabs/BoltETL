@@ -7,6 +7,7 @@ from .rcp_ntd_monthly import NTDMonthly
 from .ride_requests import RideRequests
 from .rider_accounts import RiderAccounts
 from .via_s10 import ViaS10
+from . import warehouse
 
 
 __all__ = [
@@ -18,5 +19,6 @@ __all__ = [
     "NTDMonthly",
     "RiderAccounts",
     "RideRequests",
-    "ViaS10"
+    "ViaS10",
+    "Warehouse",
 ]

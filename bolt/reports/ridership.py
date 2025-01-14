@@ -1,6 +1,6 @@
 import pandas as pd
 
-# FROM CLAUDE.ai
+# FROM CLAUDE.ai (converted SQL to pandas)
 # TODO: working....
 def transform_ntd_data(df):
     """
