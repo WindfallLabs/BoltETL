@@ -1,13 +1,16 @@
 /* Demand-Response Stats for Monthly NTD Reporting */
 CREATE OR REPLACE VIEW view_dr_stats AS
-SELECT 
+SELECT
+    Seq,
     YMTH,
+    CAST(SUBSTR(CAST(YMTH AS TEXT), 0, 5) AS INTEGER) AS Year,
     'DR' AS Mode,
     "Label",
     ROUND("Value", 2) AS Value
 FROM (
     -- Ridership
-    SELECT 
+    SELECT
+        9 AS Seq,
         YMTH,
         service || ' Ridership' as "Label",
         "Ridership (DR)" as "Value"
@@ -16,7 +19,8 @@ FROM (
     UNION ALL
 
     -- Revenue Miles
-    SELECT 
+    SELECT
+        10 AS Seq,
         YMTH,
         service || ' Revenue Miles' as "Label",
         "Vehicle Revenue Miles (DR)" as "Value"
@@ -25,7 +29,8 @@ FROM (
     UNION ALL
 
     -- Revenue Hours
-    SELECT 
+    SELECT
+        11 AS Seq,
         YMTH,
         service || ' Revenue Hours' as "Label",
         "Vehicle Revenue Hours (DR)" as "Value"
@@ -34,7 +39,8 @@ FROM (
     UNION ALL
 
     -- Passenger Miles
-    SELECT 
+    SELECT
+        12 AS Seq,
         YMTH,
         service || ' Passenger Miles' as "Label",
         "Passenger Miles (DR)" as "Value"
@@ -43,7 +49,8 @@ FROM (
     UNION ALL
 
     -- Total Vehicle Miles
-    SELECT 
+    SELECT
+        13 AS Seq,
         YMTH,
         service || ' Total Vehicle Miles' as "Label",
         "Total Vehicle Miles (DR)" as "Value"
@@ -52,7 +59,8 @@ FROM (
     UNION ALL
 
     -- Total Vehicle Hours
-    SELECT 
+    SELECT
+        14 AS Seq,
         YMTH,
         service || ' Total Vehicle Hours' as "Label",
         "Total Vehicle Hours (DR)" as "Value"
@@ -61,7 +69,8 @@ FROM (
     UNION ALL
 
     -- Deadhead Miles
-    SELECT 
+    SELECT
+        15 AS Seq,
         YMTH,
         service || ' Deadhead Miles' as "Label",
         "Deadhead Miles" as "Value"
@@ -70,7 +79,8 @@ FROM (
     UNION ALL
 
     -- Deadhead Hours
-    SELECT 
+    SELECT
+        16 AS Seq,
         YMTH,
         service || ' Deadhead Hours' as "Label",
         "Deadhead Hours" as "Value"

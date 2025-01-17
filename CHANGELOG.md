@@ -40,20 +40,32 @@ To-Do:
 - [ ] City Nhoods, Wards
 - [ ] MUTD Boundaries
 - [ ] House/Senate Districts
-- [ ] Logging
 
 Added:
+- Created 'bolt-cmd.py' using cyclopts
+    - Began development of data-file tracking (git-like `status` and `add` commands)
+        - Bug: when file added and 'add' is run, status shows all files & add adds all
+        - Bug: Remove doesn't work
+    - Began development of `update` command
+    - Began developemtn of `report` command
+        - Options for `run`, `info`, and `list`
+- Began development of a DuckDB data warehouse
+    - '.sql' files get executed against the warehouse at creation
+- Implemented BaseReport ABC
+- Logging available to subclasses of `BaseReport` and `Datasource`
+    - Added logging to 'County4.py'
+    - Refactored and added logging for 'drivershifts.py'
 - Mt DOR Cadastral `County4` object
     - Currently requires external "oriondb" code and update procedure
-- `download` method on Parcels
-- CR0174 all raw files; complete history back to 2023-01
-- Began development of a DuckDB data warehouse
-- Began development of data-file tracking (git-like 'status' and 'add' commands)
-- SQL files for NTD monthly ridership reporting in "/reports/sql"
-
+- CR0174 all raw files downloaded; complete history back to 2023-01
+- Added 'NTDMonthly' report
+- Report-specific SQL files are stored in "/reports/sql" (not the Python module)
+- 'funcs' module in utils for misc funcs ('fiscal_year' for SQL)
 
 Changed:
 - Cleaner types module
+- Refactored 'ParatransitNoShows' report
+- Migrating from 'invoke' to 'cyclopts' for cmd scripts (see added functionality)
 
 
 ## [0.0.2] - 2025-01-08

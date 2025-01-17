@@ -14,10 +14,10 @@
         - Intended Use: Both human-use (e.g. in GIS, Excel, etc.) and machine-use (automations/processing)
         - e.g. Routes, Stops, etc.
         - e.g. `FY2024 Statistics.xlsx`
-    - `/derived` - Contains data that is derived from other data; i.e. is the product of processing
+    - `/enriched` - Contains data that is derived from other data; i.e. is the product of processing
         - Deletion: Somewhat delete-safe; deleted files can be recreated (although, possibly not easily), but _will likely cause side effects_
         - Intended Use: Human-readable formats only
-        - Alternate name: `exports`
+        - Alternate name: `exports`, `derived`
         - Unlike the `cached` folder, data here _is_ intended for use by human users
         - e.g. Paratransit Boundary (buffered and unioned Routes)
         - e.g. Human-readable Excel files, etc.
@@ -29,6 +29,7 @@
         - e.g. Processed `raw` data (Via reports, Clever reports, etc.)
     - `/scratch` - Temporary workspace for exploratory analysis, manual processing, and just messing about
         - Not delete-safe; but should be emptied often
+    - `warehouse.duckdb` - Data Warehouse
 
 
 - `/Reports` - _WIP_ parent folder for all reports; intended for cross-agency access; "the shelf".

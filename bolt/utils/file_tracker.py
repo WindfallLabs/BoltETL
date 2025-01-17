@@ -1,3 +1,4 @@
+"""Git-like tracking for (raw) data files."""
 import hashlib
 import os
 from datetime import datetime
@@ -25,12 +26,12 @@ console = Console()
 
 class FileTracker:
     def __init__(self, db_path="file_tracker.duckdb"):
-        """Initialize the file tracker with a SQLite database."""
+        """Initialize the file tracker with a DuckDB database."""
         self.db_path = db_path
         self.setup_database()
 
     def setup_database(self):
-        """Create the SQLite database and table if they don't exist."""
+        """Create the DuckDB database and table if they don't exist."""
         with duckdb.connect(self.db_path) as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS files (
@@ -99,7 +100,7 @@ class FileTracker:
                  for path, info in current_files.items()]
             )
 
-    def status(self):
+    def get_changes(self):
         """Check the status of files compared to the last tracked state."""
         current_files = self.get_current_files()
         tracked_files = self.get_tracked_files()
@@ -121,52 +122,29 @@ class FileTracker:
         for file_path in tracked_files:
             if file_path not in current_files:
                 changes['removed'].append(file_path)
-        
-        # Print changes
-        if changes['new_files']:
-            status = "new file:"
-            #console.print("\nNew files:")
-            for file in sorted(changes['new_files']):
-                #console.print(f"    [red]{file}[/]")
-                console.print(f"        [red]{status.ljust(11)} {file}[/]")
-        
-        if changes['modified']:
-            status = "modified:"
-            #console.print("\nModified files:")
-            for file in sorted(changes['modified']):
-                #console.print(f"    [red]{file}[/]")
-                console.print(f"        [red]{status.ljust(11)} {file}[/]")
-        
-        if changes['removed']:
-            status = "removed:"
-            #console.print("\nRemoved files:")
-            for file in sorted(changes['removed']):
-                #console.print(f"    [red]{file}[/]")
-                console.print(f"        [red]{status.ljust(11)} {file}[/]")
-        
-        if not any(changes.values()):
-            console.print("\n[green]No changes detected.[/]")
-        
+
         return changes
 
-    def commit_changes(self):
+    def commit_changes(self, files: list[str]):
         """Update the database with the current state of files."""
-        current_files = self.get_current_files()
-        #self.update_database(current_files)
+        current_files: dict = self.get_current_files()
+        updates: dict = {p: current_files[p] for p in files}
+        removals: list = ...
 
         with duckdb.connect(self.db_path) as conn:
             # Clear existing entries
             conn.execute("DELETE FROM files")
-            
+
             # Insert current files
             conn.executemany(
                 "INSERT INTO files (file_path, sha256_hash, modified_date) VALUES (?, ?, ?)",
                 [(path, info['hash'], info['modified']) 
-                 for path, info in current_files.items()]
+                 for path, info in updates.items()]
             )
 
         # TODO: 158 files updated is misleading...
-        console.print(f"[green]Changes committed:[/] {len(current_files)}")
+        #console.print(f"[green]Changes committed:[/] {len(current_files)}")
+        return
 
 
 if __name__ == "__main__":

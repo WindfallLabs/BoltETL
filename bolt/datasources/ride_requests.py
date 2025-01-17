@@ -11,7 +11,7 @@ GRACE_ARRIVAL_MINS = 4
 
 class RideRequests(Datasource):
     def __init__(self):
-        self.init()
+        super().__init__()
 
     def transform(self):
         """Process each raw dataframe and concat."""

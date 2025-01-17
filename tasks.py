@@ -103,6 +103,7 @@ def check_inventory(c) -> None:
     return
 
 
+'''
 @task
 def update(c, datasource: str="all", cache: int=1):  # TODO: flag to cache data
     datasources: list[Datasource] = (
@@ -129,34 +130,7 @@ def update(c, datasource: str="all", cache: int=1):  # TODO: flag to cache data
     for name, err in errors:
         console.print(f"- [blue]{name}[/]: [red]{err}[/]")
     return
-
-
-# ============================================================================
-# WIP
-
-@task
-def status(c):  # TODO: WIP
-    """A git-like status command that lists unregistered datasets."""
-    console.print("Data files not registered:")
-    console.print('(use "invoke add <file>..." to register new files)')
-    for i in [
-        r"C:\Workspace\tmpdb\Data\raw\CR - CR0174\202301-Weekday-CR-0174 Incident Adjusted Distance and Time - Jan 13 2025.csv",
-        r"C:\Workspace\tmpdb\Data\raw\CR - CR0174\202301-Saturday-CR-0174 Incident Adjusted Distance and Time - Jan 13 2025.csv",
-        r"C:\Workspace\tmpdb\Data\raw\CR - CR0174\202301-Sunday-CR-0174 Incident Adjusted Distance and Time - Jan 13 2025.csv",
-    ]:
-        console.print(f"        [red]added:    {Path(i).name}[/]")
-
-@task
-def add(c):
-    """A git-like add command that adds unregistered datasets."""
-    ...
-
-
-@task
-def update_db(c):
-    """PLACEHOLDER"""
-    bolt.datasources.warehouse.load_cache_files(compact_db=True)
-    return
+'''
 
 # ============================================================================
 # REPORT RUNNERS

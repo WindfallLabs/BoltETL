@@ -9,7 +9,7 @@ from . import Datasource
 
 class NTDMonthly(Datasource):
     def __init__(self):
-        self.init()
+        super().__init__()
 
     def transform_one(self, filepath: str, raw_df: pd.DataFrame) -> pd.DataFrame:
         """Processes the NTD_MONTHLY_REPORT from Ridecheck+."""

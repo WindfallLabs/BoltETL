@@ -4,18 +4,36 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
-from bolt.utils import config
+from bolt.utils import config, funcs
 
 
 DB_PATH = config.data_dir.joinpath("data_warehouse.duckdb")
 
+SQL_FUNCS = [
+    funcs.fiscal_year,
+]
 
-def connect():
+SQL_FILES: list[Path] = list(Path(__file__).parent.joinpath("sql").glob("*.sql"))
+
+
+def load_funcs(con: duckdb.DuckDBPyConnection) -> None:
+    for fn in SQL_FUNCS:
+        try:
+            con.remove_function(fn.__name__)
+        except duckdb.InvalidInputException:
+            pass
+        con.create_function(fn.__name__, fn)  # TODO: might throw a CatalogException
+    return
+
+
+def connect() -> duckdb.DuckDBPyConnection:
     """Connect to the DuckDB data warehouse."""
-    return duckdb.connect(DB_PATH)
+    con = duckdb.connect(DB_PATH)
+    load_funcs(con)
+    return con
 
 
-def compact():
+def compact() -> tuple[str]:
     """Makes a compacted copy of the DuckDB Data Warehouse.
 
     Helps resolve file size increase issue found here:
@@ -33,27 +51,43 @@ def compact():
     DB_PATH.unlink()
     new_db.rename(new_db.parent.joinpath(name))
     new_size = DB_PATH.stat().st_size / 1024
-    print(f"  Compacted ({old_size:,.0f} KB to {new_size:,.0f} KB)")
-    return
+    #print(f"  Compacted ({old_size:,.0f} KB to {new_size:,.0f} KB)")
+    return f"Compacted ({old_size:,.0f} KB to {new_size:,.0f} KB)"
 
 
-def load_cache_files(compact_db=False):
+def load_cache_files(compact_db=False) -> None:
     """Loads feather files into the DuckDB Data Warehouse."""
-    db = duckdb.connect(DB_PATH)
-    for i in config.cache_dir.rglob("*.feather"):
-        tbl_name = Path(i).name.split(".")[0]
-        # Load the feather file as a dataframe
-        df = pd.read_feather(i, dtype_backend="pyarrow")
-        # Load the dataframe into DuckDB
-        db.sql(f"CREATE OR REPLACE TABLE {tbl_name} AS SELECT * FROM df")  # reads from Python variables I guess?
-    for i in config.sql_dir.rglob("*.sql"):
-        sql_file = Path(i).absolute()
-        with sql_file.open() as f:
-            db.sql(f.read())
+    with duckdb.connect(DB_PATH) as con:
+        tables_loaded = 0
+        for i in config.cache_dir.rglob("*.feather"):
+            tbl_name = Path(i).name.split(".")[0]
+            # Load the feather file as a dataframe
+            df = pd.read_feather(i, dtype_backend="pyarrow")
+            # Load the dataframe into DuckDB
+            con.sql(f"CREATE OR REPLACE TABLE {tbl_name} AS SELECT * FROM df")  # reads from Python variables I guess?
+            tables_loaded += 1
 
-    loaded_tables = db.sql("SELECT table_name FROM duckdb_tables").df().count().item()
-    print(f"  Loaded tables: {loaded_tables}")
-    db.close()
+    #print(f"  Loaded tables: {tables_loaded}")
+    return tables_loaded
+
+
+def execute_sql():
+    sql_file_count = 0
+    for sql_file in SQL_FILES:
+        #print(sql_file)  # DEBUG
+        with sql_file.open() as f:
+            sql = f.read()
+            with duckdb.connect(DB_PATH) as con:
+                con.sql(sql)
+        sql_file_count += 1
+    return sql_file_count
+
+
+def update_db(compact_db=False) -> tuple[int, str]:
+    """Update the DuckDB data warehouse."""
+    tables_loaded = load_cache_files()
+    sql_file_count = execute_sql()
+    compact_msg = ""
     if compact_db:
-        compact()
-    return
+        compact_msg = compact()
+    return (tables_loaded, sql_file_count, compact_msg)

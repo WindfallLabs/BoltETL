@@ -7,7 +7,7 @@ from . import Datasource
 
 class ViaS10(Datasource):
     def __init__(self):
-        self.init()
+        super().__init__()
 
     def transform_one(self, filepath: str, raw_df: pd.DataFrame) -> pd.DataFrame:
         df = raw_df.copy()

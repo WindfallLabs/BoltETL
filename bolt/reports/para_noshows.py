@@ -1,11 +1,12 @@
 import datetime as dt
+from collections import OrderedDict
 from pathlib import Path
 
 import pandas as pd
 from rich.console import Console
 
-from datasources import RideRequests, RiderAccounts  # Report
-
+from bolt.datasources import RideRequests, RiderAccounts  # Report
+from bolt.reports import BaseReport
 
 console = Console()
 
@@ -13,56 +14,33 @@ console = Console()
 GRACE_ARRIVAL_MINS = 4
 
 
-def try_strftime(x: dt.datetime, fmt: str) -> str:
-    try:
-        return x.strftime(fmt)
-    except Exception:
-        return ""
-
-
-#class NoShowReport(Report):
-class NoShowReport():
+class ParatransitNoShows(BaseReport):
     def __init__(self):
-        self.acc: pd.DataFrame|None = None
-        self.req: pd.DataFrame|None = None
-        self.data: pd.DataFrame|None = None
+        super().__init__()
+        # Data (enforce sheet order here)
+        self.data: dict[str, pd.DataFrame|None] = {"Summary": None, "All Penalties": None}
         self.out_path: Path = Path(r"C:\Workspace\tmpdb\Reports\ParaNoShows")
-        #self.start: dt.date
-        #self.end: dt.date
+        self.logger.debug("Initialized")
 
-    def load_data(self, refresh=False):  # TODO: True causes some recursion...
-        req = RideRequests()
-        acc = RiderAccounts()
-
-        if refresh:
-            raise NotImplementedError("'refresh' option is in development")
-            #with console.status("NoShowReport: Refreshing data..."):
-            req.update()
-            acc.update()
-        with console.status("NoShowReport: Loading data..."):
-            # Requests
-            self.req = req.read_cache().data
-            # Accounts
-            self.acc = acc.read_cache().data
-        return
-
-    #def process(self, start: dt.date, end: dt.date):
-    def process(self, start: str, end: str):
-        """Main report logic.
-        
-        Args:
-            start: min dt.date to include in processing
-            end: max dt.date to include in processing
-        """
-        # Remove dashes, if any, and parse to datetime
+    def process(self, start: str, end: str):  # NOTE: these are passed from CLI
+        """Main report logic."""
+        # Clean Args: Remove dashes, if any, and parse to datetime
         start = dt.datetime.strptime(start.replace("-", ""), "%Y%m%d")
         end = dt.datetime.strptime(end.replace("-", ""), "%Y%m%d")
+        self.logger.info(f"Processing data from {start} to {end}")
 
-        # Merge Requests and Accounts
-        df = pd.merge(self.req, self.acc, how="left", on="Rider ID")
-        #df["YMTH"] = df["Requested Pickup Time"].apply(lambda x: try_strftime(x, "%Y%m"))
-        # Limit to only those within the timeframe (yearmonth)
-        #df = df.loc[df["YMTH"] == str(yearmonth)].reset_index(drop=True)
+        req = RideRequests().read_cache()
+        self.logger.info(f"Loaded RideRequests ({req.version})")
+        acc = RiderAccounts().read_cache()
+        self.logger.info(f"Loaded RiderAccounts ({acc.version})")
+        df = pd.merge(
+            # Ride Requests
+            req.data,
+            # Rider Accounts
+            acc.data,
+            how="left",
+            on="Rider ID"
+        )
 
         df = df[
             (df["Requested Pickup Time"] >= start)
@@ -184,20 +162,22 @@ class NoShowReport():
 
         # Proof (dataframe of all records that got penalty points)
         penalties_df = df[(df["Penalty Points"] > 0)][check_cols].copy()
-        # Damnit Excel!
         penalties_df["Request ID"] = penalties_df["Request ID"].astype(str)
-        self.penalties_df = penalties_df.copy()
+        # Set to data (order set in __init__)
+        self.data["All Penalties"] = penalties_df.copy()
 
         # Half vs Full Month reporting - get the most recent dropoff
-        recent_pickup = self.req[self.req["Request Status"] == "Completed"]["Actual Pickup Time"].max()
+        recent_pickup = df[df["Request Status"] == "Completed"]["Actual Pickup Time"].max()
 
-        #if recent_pickup.day >= 16:
+        # Set data attribute
         if end.day <= 15:
             mode = "HALF"
-            self.data = warning_df
+            #self.data = warning_df
+            self.data["Summary"] = warning_df
         else:
             mode = "FULL"
-            self.data = suspension_df
+            #self.data = suspension_df
+            self.data["Summary"] = suspension_df
 
         # Derive filename from max pickup date
         filename = recent_pickup.strftime(f"%Y%m-No-Show - %b {mode}.xlsx")
@@ -205,19 +185,16 @@ class NoShowReport():
         self.out_path = self.out_path.joinpath(filename)
         return
 
-    def export(self):
-        """."""
-        if len(self.out_path.name.split(".")) != 2:
-            raise IOError("Out Directory has no name - run the report first")
-        with pd.ExcelWriter(self.out_path) as writer:
-            self.data.to_excel(
-                writer,
-                sheet_name="Summary",
-                index=False
-                )
-            self.penalties_df.to_excel(
-                writer,
-                sheet_name="All Penalties",
-                index=False
-                )
+    def run(self, start: str, end: str):
+        """Execute the Paratransit No-Show Report.
+        
+        Args:
+            start: (string) min dt.date to include in processing
+            end: (string) max dt.date to include in processing
+        
+        Example Execution:
+            `python bolt-cmd.py report ParatransitNoShows --start 20250101 --end 20250115`
+        """
+        self.process(start, end)
+        self.export()
         return

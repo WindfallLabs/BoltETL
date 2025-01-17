@@ -10,7 +10,7 @@ from . import Datasource
 
 class CR0174(Datasource):
     def __init__(self):
-        self.init()
+        super().__init__()
 
     def transform_one(self, filepath: str, raw_df: pd.DataFrame) -> pd.DataFrame:
         """Processes a raw CR-0174 report (DataFrame)."""

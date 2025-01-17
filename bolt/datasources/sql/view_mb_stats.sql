@@ -23,14 +23,17 @@ combined_metrics AS (
         AND d.YMTH = r.YMTH
 )
 -- Final selection
-SELECT 
+SELECT
+    Seq,
     YMTH,
+    CAST(SUBSTR(CAST(YMTH AS TEXT), 0, 5) AS INTEGER) AS Year,
     'MB' AS Mode,
     "Label",
     ROUND("Value", 2) AS Value
 FROM (
     -- Ridership
-    SELECT 
+    SELECT
+        1 AS Seq,
         YMTH,
         service || ' Ridership' as "Label",
         "Ridership" as "Value"
@@ -39,7 +42,8 @@ FROM (
     UNION ALL
     
     -- Revenue Miles
-    SELECT 
+    SELECT
+        2 AS Seq,
         YMTH,
         service || ' Revenue Miles (Avg)' as "Label",
         "Revenue Miles (Avg)" as "Value"
@@ -48,7 +52,8 @@ FROM (
     UNION ALL
     
     -- Revenue Hours
-    SELECT 
+    SELECT
+        3 AS Seq,
         YMTH,
         service || ' Revenue Hours' as "Label",
         "Revenue Hours" as "Value"
@@ -57,7 +62,8 @@ FROM (
     UNION ALL
     
     -- Passenger Miles
-    SELECT 
+    SELECT
+        4 AS Seq,
         YMTH,
         service || ' Passenger Miles' as "Label",
         "Passenger Miles" as "Value"
@@ -66,7 +72,8 @@ FROM (
     UNION ALL
 
     -- Total Vehicle Miles
-    SELECT 
+    SELECT
+        5 AS Seq,
         YMTH,
         service || ' Total Vehicle Miles' as "Label",
         --"Total Vehicle Miles (DR)" as "Value"
@@ -76,7 +83,8 @@ FROM (
     UNION ALL
 
     -- Total Vehicle Hours
-    SELECT 
+    SELECT
+        6 AS Seq,
         YMTH,
         service || ' Total Vehicle Hours' as "Label",
         --"Total Vehicle Hours (DR)" as "Value"
@@ -86,7 +94,8 @@ FROM (
     UNION ALL
     
     -- Deadhead Miles
-    SELECT 
+    SELECT
+        7 AS Seq,
         YMTH,
         service || ' Deadhead Miles' as "Label",
         "Deadhead Miles" as "Value"
@@ -95,7 +104,8 @@ FROM (
     UNION ALL
     
     -- Deadhead Hours
-    SELECT 
+    SELECT
+        8 AS Seq,
         YMTH,
         service || ' Deadhead Hours' as "Label",
         "Deadhead Hours" as "Value"

@@ -1,7 +1,9 @@
+from . import funcs
 from . import types
 from . import version
 from ._config import Config, CONFIG_PATH
 from ._download import download
+from ._logger import make_logger
 from ._yearmonth import YearMonth
 
 
@@ -13,6 +15,8 @@ __all__ = [
     "config",
     "CONFIG_PATH",
     "download",
+    "funcs",
+    "make_logger",
     "types",
     # ...
     "version",

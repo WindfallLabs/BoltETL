@@ -6,7 +6,7 @@ from . import Datasource
 
 class RiderAccounts(Datasource):
     def __init__(self):
-        self.init()
+        super().__init__()
 
     def transform(self):
         """."""

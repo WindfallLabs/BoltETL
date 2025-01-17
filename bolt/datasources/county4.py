@@ -1,4 +1,5 @@
 """Missoula County Cadastral data from Montana State Library."""
+import numpy as np
 import pandas as pd
 from pathlib import Path
 from sqlalchemy import Engine, create_engine
@@ -22,7 +23,7 @@ IGNORE_TBLS =  {
 
 class County4(Datasource):
     def __init__(self):
-        self.init()
+        super().__init__()
         self.engine: Engine = create_engine(self.metadata["URI"])
         self.data: dict[str, pd.DataFrame]
 
@@ -40,6 +41,7 @@ class County4(Datasource):
             (tbl_name, pd.read_sql(f"SELECT * FROM {tbl_name}", self.engine))
             for tbl_name in self.tables
         ]
+        self.logger.info("Extracted raw data")
         return
 
     def transform(self) -> None:
@@ -50,7 +52,11 @@ class County4(Datasource):
             # Filter by max TaxYear if exists
             if "TaxYear" in df.columns:
                 max_tax_year = df["TaxYear"].max()
+                if max_tax_year is np.nan:
+                    self.logger.warning(f"'{tbl_name}' has 'TaxYear' = np.nan")
+                    continue
                 df = df[df["TaxYear"] == max_tax_year]
+                self.logger.info(f"Filtered '{tbl_name}' by 'TaxYear' = {max_tax_year}")
 
             df.reset_index(inplace=True)
             data[tbl_name] = df
@@ -63,10 +69,12 @@ class County4(Datasource):
         self.data = {}
         for file in self.cache_path.rglob("*.feather"):
             self.data[file.name.split(".")[0]] = pd.read_feather(file, dtype_backend="pyarrow")
+            self.logger.info(f"Read cached file: {file}")
         return
 
     def write_cache(self, *args, **kwargs) -> None:  # overwritten
         """Cache data to multiple files."""
         for filename, data in self.data.items():
             data.to_feather(self.cache_path.joinpath(f"{filename}.feather"), *args, **kwargs)
+            self.logger.info(f"Cache file written: {filename}")
         return

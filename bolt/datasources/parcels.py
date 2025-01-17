@@ -7,7 +7,7 @@ from . import Datasource
 
 class Parcels(Datasource):
     def __init__(self):
-        self.init()
+        super().__init__()
 
     def download(self):
         """Download and overwrite existing Missoula County parcel data."""
@@ -30,6 +30,7 @@ class Parcels(Datasource):
         df = self.raw.copy().to_crs(CRS)
         # Drop useless columns
         df.drop(drop_columns, axis=1, inplace=True)
+        self.logger.info(f"Droped columns: {drop_columns}")
 
         # Convert object columns to PyArrow strings
         str_cols = [
