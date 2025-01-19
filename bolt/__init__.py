@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from . import datasources
 from . import reports
 from . import utils

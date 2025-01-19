@@ -20,5 +20,5 @@ __all__ = [
     "RiderAccounts",
     "RideRequests",
     "ViaS10",
-    "Warehouse",
+    "warehouse",
 ]

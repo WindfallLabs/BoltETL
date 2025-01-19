@@ -103,34 +103,6 @@ def check_inventory(c) -> None:
     return
 
 
-'''
-@task
-def update(c, datasource: str="all", cache: int=1):  # TODO: flag to cache data
-    datasources: list[Datasource] = (
-        [getattr(bolt.datasources, datasource)] if datasource not in ("all", "*")
-        else DATASOURCES
-    )
-    errors: list[tuple[str, Exception]] = []
-    if cache:
-        console.print("Updating:")
-    else:
-        console.print("Testing:")
-    for D in datasources:
-        d = D()
-        console.print(f"  {d.name}...")
-        try:
-            d.extract()
-            d.transform()
-            if cache:
-                d.write_cache()
-        except Exception as e:
-            errors.append((d.name, e))
-
-    console.print(f"\nError Count: {len(errors)}")
-    for name, err in errors:
-        console.print(f"- [blue]{name}[/]: [red]{err}[/]")
-    return
-'''
 
 # ============================================================================
 # REPORT RUNNERS
