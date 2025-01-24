@@ -1,11 +1,8 @@
-from . import funcs
-from . import types
-from . import version
-from ._config import Config, CONFIG_PATH
+from . import funcs, types, version
+from ._config import CONFIG_PATH, Config
 from ._download import download
 from ._logger import make_logger
 from ._yearmonth import YearMonth
-
 
 config = Config()
 CRS = config.crs
@@ -20,5 +17,5 @@ __all__ = [
     "types",
     # ...
     "version",
-    "YearMonth"
+    "YearMonth",
 ]

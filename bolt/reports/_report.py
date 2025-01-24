@@ -1,4 +1,5 @@
 """Base Report Class."""
+
 from abc import ABC, abstractmethod
 
 import pandas as pd
@@ -12,9 +13,9 @@ class BaseReport(ABC):
             self.__class__.__name__,
             config.log_dir,
         )
-        self.data: dict[str, pd.DataFrame|None] = {}
+        self.data: dict[str, pd.DataFrame | None] = {}
 
-    def export(self, append_sheets: bool=False) -> None:
+    def export(self, append_sheets: bool = False) -> None:
         """Exports the `self.data` attribute (dict[str, pd.DataFrame]) to
         sheets in an Excel file.
 
@@ -41,17 +42,13 @@ class BaseReport(ABC):
             for sheet_name, dataframe in self.data.items():
                 if not isinstance(dataframe, pd.DataFrame):
                     raise ValueError(
-                        f"Expected pd.DataFrame for '{sheet_name}', got {dataframe}")
+                        f"Expected pd.DataFrame for '{sheet_name}', got {dataframe}"
+                    )
                 # Ignore sheets that start with "_"
                 if sheet_name.startswith("_"):
                     continue
-                dataframe.to_excel(
-                    writer,
-                    sheet_name=sheet_name,
-                    index=False
-                    )
+                dataframe.to_excel(writer, sheet_name=sheet_name, index=False)
         return
 
     @abstractmethod
-    def run(self):
-        ...
+    def run(self): ...

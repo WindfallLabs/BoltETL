@@ -1,12 +1,4 @@
-from . import datasources
-from . import reports
-from . import utils
+from . import datasources, reports, utils
 from .utils import config  # provide a shortcut accessor
 
-
-__all__ = [
-    "config",
-    "datasources",
-    "reports",
-    "utils"
-]
+__all__ = ["config", "datasources", "reports", "utils"]

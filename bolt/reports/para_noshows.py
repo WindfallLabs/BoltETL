@@ -3,9 +3,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from bolt.datasources import RideRequests, RiderAccounts  # Report
+from bolt.datasources import RiderAccounts, RideRequests  # Report
 from bolt.reports import BaseReport
-
 
 # Minutes not considered late
 GRACE_ARRIVAL_MINS = 4
@@ -15,7 +14,10 @@ class ParatransitNoShows(BaseReport):
     def __init__(self):
         super().__init__()
         # Data (enforce sheet order here)
-        self.data: dict[str, pd.DataFrame|None] = {"Summary": None, "All Penalties": None}
+        self.data: dict[str, pd.DataFrame | None] = {
+            "Summary": None,
+            "All Penalties": None,
+        }
         self.out_path: Path = Path(r"C:\Workspace\tmpdb\Reports\ParaNoShows")
         self.logger.debug("Initialized")
 
@@ -32,14 +34,12 @@ class ParatransitNoShows(BaseReport):
         req = RideRequests().read_cache()
         req_df = req.data.copy()
         self.logger.info(f"Loaded RideRequests ({req.version})")
-        req_df = (
-            req_df[
-                # Filter by date range
-                (req_df["Requested Pickup Time"] >= start)
-                & (req_df["Requested Pickup Time"] <= end)
-            ].reset_index(drop=True)
-        )
-        self.logger.info(f"Filtered RideRequests to date range and Late/No-Show")
+        req_df = req_df[
+            # Filter by date range
+            (req_df["Requested Pickup Time"] >= start)
+            & (req_df["Requested Pickup Time"] <= end)
+        ].reset_index(drop=True)
+        self.logger.info("Filtered RideRequests to date range and Late/No-Show")
 
         # Update 'Cancel' values to 'Late Cancel' in "Request Status"
         req_df.loc[req_df["Late Cancellation"] == "Y", "Request Status"] = "Late Cancel"
@@ -55,7 +55,8 @@ class ParatransitNoShows(BaseReport):
                 | (req_df["Request Status"] == "No Show")
             ),
             # ...set the Penalty Points to 1
-            "Penalty Points"] = 1
+            "Penalty Points",
+        ] = 1
 
         # Read Rider Accounts
         acc = RiderAccounts().read_cache()
@@ -68,7 +69,7 @@ class ParatransitNoShows(BaseReport):
             # Rider Accounts
             acc.data,
             how="left",
-            on="Rider ID"
+            on="Rider ID",
         )
 
         # Aggregation (group-by or pivot table)
@@ -77,20 +78,29 @@ class ParatransitNoShows(BaseReport):
             "First Name": "first",
             "Phone Number": "first",
             "Penalty Points": "sum",
-            "Request ID": "count"
+            "Request ID": "count",
         }
 
         # Resulting table
-        g = df.groupby("Rider ID").agg(agg).reset_index().rename({"Request ID": "Trips Booked"}, axis=1)
+        g = (
+            df.groupby("Rider ID")
+            .agg(agg)
+            .reset_index()
+            .rename({"Request ID": "Trips Booked"}, axis=1)
+        )
 
         # TODO: split Micro- and Paratransit trip counts
         # Split micro- and para- trips
         service_pivot = pd.pivot_table(
-            df.groupby(["Rider ID", "Service"])["Request ID"].count().reset_index().rename({"Request ID": "Count"}, axis=1),
-            values='Count',
-            index='Rider ID',
-            columns='Service',
-            aggfunc='sum').reset_index()
+            df.groupby(["Rider ID", "Service"])["Request ID"]
+            .count()
+            .reset_index()
+            .rename({"Request ID": "Count"}, axis=1),
+            values="Count",
+            index="Rider ID",
+            columns="Service",
+            aggfunc="sum",
+        ).reset_index()
 
         g = pd.merge(g, service_pivot, on="Rider ID", how="left")
         g["Microtransit"] = g["Microtransit"].fillna(0).astype(int)
@@ -110,8 +120,8 @@ class ParatransitNoShows(BaseReport):
 
         # Rules for suspension
         suspend = (
-            (g["Penalty Points"] >= 5)\
-            & (g["Trips Booked"] >= 10)\
+            (g["Penalty Points"] >= 5)
+            & (g["Trips Booked"] >= 10)
             & (g["%"] >= 0.1)  # We only need this field here (drop later)
         )
 
@@ -134,11 +144,11 @@ class ParatransitNoShows(BaseReport):
             "Requested Pickup Time",
             "Cancellation Time",
             "Cancellation Reason",
-            "Penalty Points"
+            "Penalty Points",
         ]
 
         # Proof (dataframe of all records that got penalty points)
-        #penalties_df = df[(df["Penalty Points"] > 0)][check_cols].copy()
+        # penalties_df = df[(df["Penalty Points"] > 0)][check_cols].copy()
         # The "proof" sheet is all rides (within date range) for a user with 1+ penalty points
         users_with_penalties = set(g[g["Penalty Points"] > 0]["Rider ID"])
         penalties_df = df[df["Rider ID"].isin(users_with_penalties)][check_cols].copy()
@@ -148,16 +158,18 @@ class ParatransitNoShows(BaseReport):
         self.data["All Penalties"] = penalties_df.copy()
 
         # Half vs Full Month reporting - get the most recent dropoff
-        recent_pickup = df[df["Request Status"] == "Completed"]["Actual Pickup Time"].max()
+        recent_pickup = df[df["Request Status"] == "Completed"][
+            "Actual Pickup Time"
+        ].max()
 
         # Set data attribute
         if end.day <= 15:
             mode = "HALF"
-            #self.data = warning_df
+            # self.data = warning_df
             self.data["Summary"] = warning_df
         else:
             mode = "FULL"
-            #self.data = suspension_df
+            # self.data = suspension_df
             self.data["Summary"] = suspension_df
 
         # Derive filename from max pickup date
@@ -168,11 +180,11 @@ class ParatransitNoShows(BaseReport):
 
     def run(self, start: str, end: str):
         """Execute the Paratransit No-Show Report.
-        
+
         Args:
             start: (string) min dt.date to include in processing
             end: (string) max dt.date to include in processing
-        
+
         Example Execution:
             `python bolt-cmd.py report ParatransitNoShows --start 20250101 --end 20250115`
         """

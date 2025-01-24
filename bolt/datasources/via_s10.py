@@ -1,7 +1,10 @@
 """NTD S-10 report from Via"""
+
 import pandas as pd
 
-from bolt.utils import servicedays as sd, YearMonth
+from bolt.utils import YearMonth
+from bolt.utils import servicedays as sd
+
 from . import Datasource
 
 
@@ -64,11 +67,13 @@ class ViaS10(Datasource):
             "Total Vehicle Miles (DR)",
             "Total Vehicle Hours (DR)",
             "Deadhead Miles",  # Same
-            "Deadhead Hours"  # Same
+            "Deadhead Hours",  # Same
         ]
 
         # Validation:
-        assert len(col_names) == len(agg_funcs) == len(rename_values), "Problem with renames or agg columns"
+        assert (
+            len(col_names) == len(agg_funcs) == len(rename_values)
+        ), "Problem with renames or agg columns"
         # Pair up the columns, aggregation funcs, and new names
         agg_dict = dict(zip(col_names, agg_funcs))
         renames = dict(zip(col_names, rename_values))
@@ -76,17 +81,20 @@ class ViaS10(Datasource):
 
         # Aggregate
         df = (
-            df.groupby("Service").agg(agg_dict)
+            df.groupby("Service")
+            .agg(agg_dict)
             .reset_index()
             .rename(renames, axis=1)[rename_values]
-            )
+        )
 
         # We don't need the row with "Closed" (and it )
         if "Closed" in set(df["Service"]):
             df = df.drop(df[df["Service"] == "Closed"].index)
         # Sort
         # TODO: make this sorter a util function?
-        df = df.sort_values("Service", key=lambda x: x.map(["Weekday", "Saturday", "Sunday"].index)).reset_index(drop=True)
+        df = df.sort_values(
+            "Service", key=lambda x: x.map(["Weekday", "Saturday", "Sunday"].index)
+        ).reset_index(drop=True)
         df = df.reset_index(drop=True)
         return df
 

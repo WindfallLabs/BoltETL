@@ -1,12 +1,14 @@
 """Missoula County Cadastral data from Montana State Library."""
+
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-from pathlib import Path
 from sqlalchemy import Engine, create_engine
 
 from bolt.utils import config
-from . import Datasource
 
+from . import Datasource
 
 TBL_SQL = """
     SELECT TABLE_NAME
@@ -14,11 +16,7 @@ TBL_SQL = """
     WHERE TABLE_TYPE = 'BASE TABLE'
 """
 
-IGNORE_TBLS =  {
-    "geometry_columns",
-    "parcels",
-    "spatial_ref_sys"
-}
+IGNORE_TBLS = {"geometry_columns", "parcels", "spatial_ref_sys"}
 
 
 class County4(Datasource):
@@ -33,7 +31,9 @@ class County4(Datasource):
 
     @property
     def tables(self) -> set[str]:
-        return set(pd.read_sql(TBL_SQL, self.engine)["TABLE_NAME"].tolist()).difference(IGNORE_TBLS)
+        return set(pd.read_sql(TBL_SQL, self.engine)["TABLE_NAME"].tolist()).difference(
+            IGNORE_TBLS
+        )
 
     def extract(self) -> None:  # overwritten
         """Read all SQL tables (names and data) to list."""
@@ -68,13 +68,17 @@ class County4(Datasource):
         """Read cached data from multiple files."""
         self.data = {}
         for file in self.cache_path.rglob("*.feather"):
-            self.data[file.name.split(".")[0]] = pd.read_feather(file, dtype_backend="pyarrow")
+            self.data[file.name.split(".")[0]] = pd.read_feather(
+                file, dtype_backend="pyarrow"
+            )
             self.logger.info(f"Read cached file: {file}")
         return
 
     def write_cache(self, *args, **kwargs) -> None:  # overwritten
         """Cache data to multiple files."""
         for filename, data in self.data.items():
-            data.to_feather(self.cache_path.joinpath(f"{filename}.feather"), *args, **kwargs)
+            data.to_feather(
+                self.cache_path.joinpath(f"{filename}.feather"), *args, **kwargs
+            )
             self.logger.info(f"Cache file written: {filename}")
         return

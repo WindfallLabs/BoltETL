@@ -1,11 +1,11 @@
 """Git-like tracking for (raw) data files."""
+
 import hashlib
 import os
 from datetime import datetime
 
 import duckdb
 from rich.console import Console
-
 
 DATA = r"C:\Workspace\tmpdb\Data\raw"
 
@@ -54,8 +54,8 @@ class FileTracker:
         current_files = {}
         for root, dirs, files in os.walk(DATA):
             # Skip .gdb directories
-            dirs[:] = [d for d in dirs if not d.endswith('.gdb')]
-            
+            dirs[:] = [d for d in dirs if not d.endswith(".gdb")]
+
             for file in files:
                 if any(file.endswith(ext) for ext in IGNORED):
                     continue
@@ -63,17 +63,17 @@ class FileTracker:
                     continue
                 full_path = os.path.join(root, file)
                 rel_path = os.path.relpath(full_path, DATA)
-                
+
                 try:
                     current_files[rel_path] = {
-                        'hash': self.calculate_file_hash(full_path),
-                        'modified': datetime.fromtimestamp(
+                        "hash": self.calculate_file_hash(full_path),
+                        "modified": datetime.fromtimestamp(
                             os.path.getmtime(full_path)
-                        ).isoformat()
+                        ).isoformat(),
                     }
                 except (PermissionError, FileNotFoundError):
                     continue
-                
+
         return current_files
 
     def get_tracked_files(self):
@@ -83,7 +83,7 @@ class FileTracker:
                 "SELECT file_path, sha256_hash, modified_date FROM files"
             )
             return {
-                row[0]: {'hash': row[1], 'modified': row[2]} 
+                row[0]: {"hash": row[1], "modified": row[2]}
                 for row in cursor.fetchall()
             }
 
@@ -92,36 +92,34 @@ class FileTracker:
         with duckdb.connect(self.db_path) as conn:
             # Clear existing entries
             conn.execute("DELETE FROM files")
-            
+
             # Insert current files
             conn.executemany(
                 "INSERT INTO files (file_path, sha256_hash, modified_date) VALUES (?, ?, ?)",
-                [(path, info['hash'], info['modified']) 
-                 for path, info in current_files.items()]
+                [
+                    (path, info["hash"], info["modified"])
+                    for path, info in current_files.items()
+                ],
             )
 
     def get_changes(self):
         """Check the status of files compared to the last tracked state."""
         current_files = self.get_current_files()
         tracked_files = self.get_tracked_files()
-        
-        changes = {
-            'new_files': [],
-            'modified': [],
-            'removed': []
-        }
-        
+
+        changes = {"new_files": [], "modified": [], "removed": []}
+
         # Check for new and modified files
         for file_path, current_info in current_files.items():
             if file_path not in tracked_files:
-                changes['new_files'].append(file_path)
-            elif current_info['hash'] != tracked_files[file_path]['hash']:
-                changes['modified'].append(file_path)
-        
+                changes["new_files"].append(file_path)
+            elif current_info["hash"] != tracked_files[file_path]["hash"]:
+                changes["modified"].append(file_path)
+
         # Check for removed files
         for file_path in tracked_files:
             if file_path not in current_files:
-                changes['removed'].append(file_path)
+                changes["removed"].append(file_path)
 
         return changes
 
@@ -138,18 +136,20 @@ class FileTracker:
             # Insert current files
             conn.executemany(
                 "INSERT INTO files (file_path, sha256_hash, modified_date) VALUES (?, ?, ?)",
-                [(path, info['hash'], info['modified']) 
-                 for path, info in updates.items()]
+                [
+                    (path, info["hash"], info["modified"])
+                    for path, info in updates.items()
+                ],
             )
 
         # TODO: 158 files updated is misleading...
-        #console.print(f"[green]Changes committed:[/] {len(current_files)}")
+        # console.print(f"[green]Changes committed:[/] {len(current_files)}")
         return
 
 
 if __name__ == "__main__":
     tracker = FileTracker()
     # For now, we'll just comment these out to test
-    #tracker.status()
+    # tracker.status()
     tracker.commit_changes()
-    #...
+    # ...

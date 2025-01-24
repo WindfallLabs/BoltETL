@@ -1,9 +1,12 @@
 """NTD MONTHLY report from Ridecheck+"""
+
 from math import ceil
 
 import pandas as pd
 
-from bolt.utils import servicedays as sd, types, YearMonth
+from bolt.utils import YearMonth, types
+from bolt.utils import servicedays as sd
+
 from . import Datasource
 
 
@@ -18,7 +21,11 @@ class NTDMonthly(Datasource):
 
         try:
             # In the case that there's a TOTAL row
-            drop_idx = int(df.loc[~df["SERVICE_PERIOD"].str.contains("Weekday|Sunday|Saturday")].index[0])
+            drop_idx = int(
+                df.loc[
+                    ~df["SERVICE_PERIOD"].str.contains("Weekday|Sunday|Saturday")
+                ].index[0]
+            )
             df.drop(drop_idx, inplace=True)
         except IndexError:
             pass
@@ -29,11 +36,11 @@ class NTDMonthly(Datasource):
             "ALIGHT",
             "PASS_MILES",
             "GROSS_SURVEYS",
-            #"AVG_SURVEYS",
-            #"ASCH_TRIPS",
+            # "AVG_SURVEYS",
+            # "ASCH_TRIPS",
             "MTH_BOARD",
             "MTH_REV_HOURS",
-            "MTH_PASS_MILES"
+            "MTH_PASS_MILES",
         ]
         df[int_cols] = df[int_cols].map(types.to_int)
 
@@ -42,7 +49,7 @@ class NTDMonthly(Datasource):
             "BOARD_PER_MI",
             "BOARD_PER_HR",
             "AVG_TRIP_LEN",
-            "FREQUENCY"
+            "FREQUENCY",
         ]
         df[float_cols] = df[float_cols].map(types.to_float)
 
@@ -79,9 +86,7 @@ class NTDMonthly(Datasource):
         df.loc[df["Service"] == "Weekday", "Avg Daily Ridership"] = (
             weekday_avg_ridership
         )
-        df.loc[df["Service"] == "Saturday", "Avg Daily Ridership"] = (
-            sat_avg_ridership
-        )
+        df.loc[df["Service"] == "Saturday", "Avg Daily Ridership"] = sat_avg_ridership
         df.loc[df["Service"] == "Sunday", "Avg Daily Ridership"] = sun_avg_ridership
 
         return df

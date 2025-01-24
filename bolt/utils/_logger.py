@@ -5,7 +5,9 @@ from pathlib import Path
 def make_logger(name: str, log_dir: Path, stream=False, level=logging.DEBUG):
     logger = logging.getLogger(name)
     logger.setLevel(level)
-    formatter = logging.Formatter('[{asctime}] [{name}/{levelname}]: {message}', style='{')
+    formatter = logging.Formatter(
+        "[{asctime}] [{name}/{levelname}]: {message}", style="{"
+    )
 
     # Add file handler
     log_file = log_dir.joinpath(f"{name}.log")

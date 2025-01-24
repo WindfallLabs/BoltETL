@@ -1,9 +1,12 @@
 """Type casting functions."""
+
 import geopandas as gpd
 import pandas as pd
 
 
-def cast_many(df: pd.DataFrame|gpd.GeoDataFrame, columns: list[str], dtype: type|pd.ArrowDtype) -> pd.DataFrame|gpd.GeoDataFrame:
+def cast_many(
+    df: pd.DataFrame | gpd.GeoDataFrame, columns: list[str], dtype: type | pd.ArrowDtype
+) -> pd.DataFrame | gpd.GeoDataFrame:
     """Cast many columns to a specified PyArrow DType."""
     df = df.copy()
     for col in columns:
@@ -35,6 +38,7 @@ def cast_ints(df: pd.DataFrame|gpd.GeoDataFrame) -> pd.DataFrame|gpd.GeoDataFram
         except Exception:
             continue
 '''
+
 
 def to_int(s):
     if isinstance(s, str):

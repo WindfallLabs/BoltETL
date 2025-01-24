@@ -1,4 +1,5 @@
 """CleverReports Report 0174 - Incident Adjusted Distance and Time"""
+
 import re
 from typing import Literal
 
@@ -6,6 +7,7 @@ import pandas as pd
 import pyarrow as pa
 
 from bolt.utils import YearMonth
+
 from . import Datasource
 
 
@@ -16,9 +18,11 @@ class CR0174(Datasource):
     def transform_one(self, filepath: str, raw_df: pd.DataFrame) -> pd.DataFrame:
         """Processes a raw CR-0174 report (DataFrame)."""
         df = raw_df.copy()
-        #yearmonth: int = int(re.findall(r"^\d{6}", filepath.split("\\")[-1])[0])
+        # yearmonth: int = int(re.findall(r"^\d{6}", filepath.split("\\")[-1])[0])
         ymth: YearMonth = YearMonth.from_filepath(filepath)
-        service_day: Literal["Weekday", "Saturday", "Sunday"] = re.findall(r"(?i)weekday|saturday|sunday", filepath)[0].title()
+        service_day: Literal["Weekday", "Saturday", "Sunday"] = re.findall(
+            r"(?i)weekday|saturday|sunday", filepath
+        )[0].title()
         # Set columns from the first row
         df.columns = df.loc[0].values
         # Drop the first row (now a duplicate of column names)
@@ -39,11 +43,11 @@ class CR0174(Datasource):
         df = df[cols]
         # Specify columns to drop
         drop_columns = [
-            #"Deadhead Distance (S)",  # TODO: Maybe we don't drop
-            #"Deadhead Distance (A)",
+            # "Deadhead Distance (S)",  # TODO: Maybe we don't drop
+            # "Deadhead Distance (A)",
             "Deadhead Distance (I)",
-            #"Deadhead Hours (S)",
-            #"Deadhead Hours (A)",
+            # "Deadhead Hours (S)",
+            # "Deadhead Hours (A)",
             "Deadhead Hours (I)",
         ]
         # Drop 'em
@@ -51,7 +55,14 @@ class CR0174(Datasource):
 
         # Fix column values (str -> float)
         for col in df.columns:
-            if col in ["Route", "Weekday", "Service", "YMTH", "Revenue Distance (I)", "Revenue Hours (I)"]:
+            if col in [
+                "Route",
+                "Weekday",
+                "Service",
+                "YMTH",
+                "Revenue Distance (I)",
+                "Revenue Hours (I)",
+            ]:
                 continue
             if df[col].dtype is pa.NA:
                 continue
@@ -68,7 +79,11 @@ class CR0174(Datasource):
             dfs.append(self.transform_one(fpath, df))
         df = pd.concat(dfs).reset_index(drop=True)
         # Add cols
-        df["Pull-In/Out Speed (S)"] = (df["Pull-In/Out Distance (S)"] / df["Pull-In/Out Hours (S)"]).round(3)
-        df["Pull-In/Out Speed (A)"] = (df["Pull-In/Out Distance (A)"] / df["Pull-In/Out Hours (A)"]).round(3)
+        df["Pull-In/Out Speed (S)"] = (
+            df["Pull-In/Out Distance (S)"] / df["Pull-In/Out Hours (S)"]
+        ).round(3)
+        df["Pull-In/Out Speed (A)"] = (
+            df["Pull-In/Out Distance (A)"] / df["Pull-In/Out Hours (A)"]
+        ).round(3)
         self.data = df
         return

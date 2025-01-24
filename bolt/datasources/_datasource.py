@@ -1,19 +1,19 @@
 """Datasource ABC."""
+
 import datetime as dt
 from abc import ABC, abstractmethod
 from getpass import getuser
 from pathlib import Path
 from platform import node
 from typing import Annotated
-from typing_extensions import Doc
 
-import pandas as pd
 import geopandas as gpd
+import pandas as pd
 from pydantic import BaseModel
 from sqlalchemy import Engine
+from typing_extensions import Doc
 
 from bolt.utils import config, make_logger, version
-
 
 SUPPORTED_CACHE_TYPES = ("DISABLE", "feather")
 
@@ -28,33 +28,33 @@ class CacheMetaData(BaseModel):
     filename: str
     export_date: str
     processed_by: str
-    #log_path: str
-    #log_md5: str
+    # log_path: str
+    # log_md5: str
     datasource_version: str
-    #datasource_md5: str
+    # datasource_md5: str
     sources: list[str]
 
 
 class Datasource[T](ABC):
     """Abstract class defining Datasource classes."""
+
     def __init__(self):
-        self.logger = make_logger(
-            self.name,
-            config.log_dir
-        )
+        self.logger = make_logger(self.name, config.log_dir)
         self.metadata: Annotated[
             dict,  # TODO: dict template / typing?
-            Doc("Data definition / metadata loaded from 'config.toml'")
+            Doc("Data definition / metadata loaded from 'config.toml'"),
         ]
 
         self.raw: Annotated[
-            list[tuple[str, pd.DataFrame|gpd.GeoDataFrame]] | None,
-            Doc("DataFrame of GeoDataFrame of raw data (created by `extract`)")
+            list[tuple[str, pd.DataFrame | gpd.GeoDataFrame]] | None,
+            Doc("DataFrame of GeoDataFrame of raw data (created by `extract`)"),
         ] = None
 
         self.data: Annotated[
-            pd.DataFrame|gpd.GeoDataFrame|None,
-            Doc("DataFrame or GeoDataFrame of processed data (created by `transform` or loaded from cache with `read_cache`)")
+            pd.DataFrame | gpd.GeoDataFrame | None,
+            Doc(
+                "DataFrame or GeoDataFrame of processed data (created by `transform` or loaded from cache with `read_cache`)"
+            ),
         ] = None
 
         try:
@@ -65,7 +65,7 @@ class Datasource[T](ABC):
             }
         except KeyError:
             raise KeyError(f"Name mismatch: '{self.name}' not in config.toml")
-        #self.logger.debug(f"Initialized {self.name}")
+        # self.logger.debug(f"Initialized {self.name}")
 
     @property
     def name(self):
@@ -79,8 +79,8 @@ class Datasource[T](ABC):
     @property
     def source_files(self) -> list[str]:
         return [
-            str(p.absolute()) for p
-            in Path(self.metadata["source_dir"]).rglob(self.metadata["filename"])
+            str(p.absolute())
+            for p in Path(self.metadata["source_dir"]).rglob(self.metadata["filename"])
             # Ignore source / raw files that start with "_"
             if not p.name.startswith("_")
         ]
@@ -88,7 +88,9 @@ class Datasource[T](ABC):
     @property
     def cache_path(self) -> Path:
         """Return the path (string) to cached data file."""
-        cache_filetype = self.metadata.get("cache_filetype", "feather")  # TODO: DOCUMENT that caching to .feather is default
+        cache_filetype = self.metadata.get(
+            "cache_filetype", "feather"
+        )  # TODO: DOCUMENT that caching to .feather is default
         if cache_filetype not in SUPPORTED_CACHE_TYPES:
             raise TypeError(f"'{cache_filetype}' file type not (yet) supported")
         if cache_filetype == "DISABLE":
@@ -106,7 +108,9 @@ class Datasource[T](ABC):
             self.logger.debug(f"Extracted raw data ({layer}; with geopandas)")
         else:
             read_func = READERS[ext]
-            self.raw = [(p, read_func(p, dtype_backend="pyarrow")) for p in self.source_files]
+            self.raw = [
+                (p, read_func(p, dtype_backend="pyarrow")) for p in self.source_files
+            ]
             self.logger.debug("Extracted raw data")
         # TODO: self.logger.debug("Raw files loaded: 8/8")
         return
@@ -128,13 +132,13 @@ class Datasource[T](ABC):
         self.data.to_feather(self.cache_path, *args, **kwargs)
         self.logger.info(f"Wrote cache file: {self.cache_path}")
         metadata = self.cache_metadata()
-        #self.logger.info(f"Metadata (processed_by): {metadata.processed_by}")
-        #self.logger.info(f"Metadata (version): {metadata.datasource_version}")
-        #self.logger.info(f"Metadata (sources): {metadata.sources}")
-        #....
+        # self.logger.info(f"Metadata (processed_by): {metadata.processed_by}")
+        # self.logger.info(f"Metadata (version): {metadata.datasource_version}")
+        # self.logger.info(f"Metadata (sources): {metadata.sources}")
+        # ....
 
         # TODO: dump cache metadata
-        #self.cache_metadata().dump()...
+        # self.cache_metadata().dump()...
         return
 
     def cache_metadata(self):
@@ -142,11 +146,11 @@ class Datasource[T](ABC):
             filename=f"{self.name}.feather",
             export_date=dt.datetime.now().strftime("%Y-%m-%d"),
             processed_by=f"{getuser()}/{node()}",
-            #log_path=self.log.path,
-            #log_md5=hashfile(self.log.path),
+            # log_path=self.log.path,
+            # log_md5=hashfile(self.log.path),
             datasource_version=str(self.version),  # TODO: wip
-            #datasource_md5=hashfile(Path(__file__).absolute()),
-            sources=sorted(self.source_files, reverse=True)
+            # datasource_md5=hashfile(Path(__file__).absolute()),
+            sources=sorted(self.source_files, reverse=True),
         )
         return cmeta
 
@@ -154,12 +158,16 @@ class Datasource[T](ABC):
         """Loads data attribute from cache file."""
         h = "HASH"  # TODO: file hash/metadata
         if self.metadata.get("load_with_geopandas", False):
-            self.data = gpd.read_feather(self.cache_path, *args, **kwargs)  # TODO: convert columns to pyarrow types?
-            #self.logger.info(f"Cached file read (with geopandas): {self.version} {h}")
+            self.data = gpd.read_feather(
+                self.cache_path, *args, **kwargs
+            )  # TODO: convert columns to pyarrow types?
+            # self.logger.info(f"Cached file read (with geopandas): {self.version} {h}")
         else:
-            self.data = pd.read_feather(self.cache_path, *args, **kwargs, dtype_backend="pyarrow")
-            #self.logger.info(f"Cached file read: {self.version} {h}")  # TODO: file hash
-        
+            self.data = pd.read_feather(
+                self.cache_path, *args, **kwargs, dtype_backend="pyarrow"
+            )
+            # self.logger.info(f"Cached file read: {self.version} {h}")  # TODO: file hash
+
         # Load cache metadata
         # TODO: json.load(.../cached/.metadata/{filename}) -> bolt.config.metadata[filename]
         return self

@@ -2,6 +2,7 @@
 Author: Garin Wally; 2024-12-16
 For now... might migrate to click.
 """
+
 import datetime as dt
 import json
 from hashlib import sha256
@@ -11,8 +12,8 @@ from rich.console import Console
 
 import bolt
 from bolt.datasources import (
-    County4,
     CR0174,
+    County4,
     Datasource,
     DriverShifts,
     NTDMonthly,
@@ -21,7 +22,6 @@ from bolt.datasources import (
     RideRequests,
     ViaS10,
 )
-
 
 DATASOURCES: list[Datasource] = [
     # TODO: get from bolt.config?
@@ -43,13 +43,13 @@ INVENTORY_STALE = 15
 
 
 def json_data_inventory() -> dict:
-    """Gets contents of the Data folder as a dict/json."""    
+    """Gets contents of the Data folder as a dict/json."""
     files = [str(i).replace("\\", "/") for i in bolt.config.data_path.rglob("*.*")]
     d = {
         "sha256": sha256(str(files).encode("UTF8")).hexdigest(),
         "last_update": dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "files": files
-        }
+        "files": files,
+    }
     return d
 
 
@@ -78,12 +78,9 @@ def check_inventory(c) -> None:
     console.print(f"Last Update: [blue]{file_inventory['last_update']}[/]")
     if is_synced:
         # Check how old the inventory is
-        recent: bool = (
-            dt.datetime.strptime(
-                file_inventory["last_update"],
-                "%Y-%m-%d %H:%M:%S"
-                ) > dt.datetime.now() - dt.timedelta(days=INVENTORY_STALE)
-        )
+        recent: bool = dt.datetime.strptime(
+            file_inventory["last_update"], "%Y-%m-%d %H:%M:%S"
+        ) > dt.datetime.now() - dt.timedelta(days=INVENTORY_STALE)
         if recent:
             console.print("Status: [green]Synchronized[/]")
         else:
@@ -100,7 +97,6 @@ def check_inventory(c) -> None:
         if mv_or_rm:
             console.print(f"    Files Missing or Removed: {mv_or_rm}")
     return
-
 
 
 # ============================================================================

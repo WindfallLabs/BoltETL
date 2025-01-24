@@ -11,7 +11,7 @@ def memory_unzip(payload) -> list[tuple[str, bytes]]:
         # Handle multiple files in zipped payload
         for filename in zf.namelist():
             # Skip directory entries in zip file
-            if filename.endswith('/'):
+            if filename.endswith("/"):
                 continue
             # Open the zipped files and extract each
             with zf.open(filename) as file_obj:
@@ -24,15 +24,15 @@ def download(url: str, out_dir: Path, unzip=True):
     """Download and extract files, preserving directory structure."""
     # Ensure output directory exists
     out_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Get the payload to download
     payload: bytes = urlopen(url).read()
-    
+
     # Determine if the payload should be unzipped (in-memory)
     if unzip and url.endswith(".zip"):
         # Unzip the payload in-memory
         payload: list[bytes] = memory_unzip(payload)
-        
+
     if isinstance(payload, list):
         for filename, file_content in payload:
             # Create full path including any subdirectories
@@ -44,8 +44,8 @@ def download(url: str, out_dir: Path, unzip=True):
                 f.write(file_content)
     else:
         # Handle non-zip files
-        filename = url.split('/')[-1]
+        filename = url.split("/")[-1]
         with (out_dir / filename).open("wb") as f:
             f.write(payload)
-            
+
     return out_dir

@@ -1,3 +1,4 @@
+from . import warehouse
 from ._datasource import Datasource
 from .county4 import County4
 from .cr0174 import CR0174
@@ -7,8 +8,6 @@ from .rcp_ntd_monthly import NTDMonthly
 from .ride_requests import RideRequests
 from .rider_accounts import RiderAccounts
 from .via_s10 import ViaS10
-from . import warehouse
-
 
 __all__ = [
     "Datasource",

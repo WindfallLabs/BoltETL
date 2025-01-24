@@ -1,7 +1,9 @@
 """DriverShifts report from Via"""
+
 import pandas as pd
 
 from bolt.utils import YearMonth
+
 from . import Datasource
 
 
@@ -38,8 +40,8 @@ class DriverShifts(Datasource):
         self.logger.info(f"Converted fields to pd.datetime: {shift_date_cols}")
 
         # Drop 'Plate Number' field due to type errors
-        #df["Plate Number"] = df["Plate Number"].to_string().astype(types.pyarrow_string)
-        #self.logger.info("Casted field 'Plate Number' to string")
+        # df["Plate Number"] = df["Plate Number"].to_string().astype(types.pyarrow_string)
+        # self.logger.info("Casted field 'Plate Number' to string")
         df.drop("Plate Number", axis=1, inplace=True)
         self.logger.info("Dropped field 'Plate Number'")
 
@@ -53,15 +55,13 @@ class DriverShifts(Datasource):
         ).apply(lambda x: x.total_seconds() / 60 / 60)
         self.logger.info("Calculated field 'Planned Shift Duration'")
 
-        df["Shift Duration"] = (
-            df["Shift End Time"] - df["Shift Start Time"]
-        ).apply(lambda x: x.total_seconds() / 60 / 60)
+        df["Shift Duration"] = (df["Shift End Time"] - df["Shift Start Time"]).apply(
+            lambda x: x.total_seconds() / 60 / 60
+        )
         self.logger.info("Calculated field 'Shift Duration'")
 
         # Extra Time
-        df["Extra Time"] = (
-            df["Shift Duration"] - df["Planned Shift Duration"]
-        )
+        df["Extra Time"] = df["Shift Duration"] - df["Planned Shift Duration"]
         self.logger.info("Calculated field 'Extra Time'")
 
         # Missed Signoff

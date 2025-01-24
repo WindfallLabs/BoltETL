@@ -1,6 +1,7 @@
 """Misc Functions"""
 
-def fiscal_year(year_month: int|str) -> str:
+
+def fiscal_year(year_month: int | str) -> str:
     """Calculate a US Federal fiscal year from a YearMonth."""
     year = int(str(year_month)[:4])
     month = int(str(year_month)[4:])

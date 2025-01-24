@@ -7,8 +7,6 @@ from rich.console import Console
 
 import bolt
 from bolt.utils.file_tracker import FileTracker
-#from bolt.reports import reports
-
 
 console = Console()
 app = cyclopts.App()
@@ -28,9 +26,7 @@ for ds in bolt.config.metadata.keys():
     except AttributeError:
         pass
 
-REPORTS: list = [
-
-]
+REPORTS: list = []
 
 
 @app.command
@@ -64,25 +60,27 @@ def add(datafile: str):
 @app.command
 def status():
     changes: dict = tracker.get_changes()
-    console.print("Changes to data files:")  # TODO: always prints, even if status is 'No changes'
+    console.print(
+        "Changes to data files:"
+    )  # TODO: always prints, even if status is 'No changes'
     console.print(f'  (use "python {SCRIPT} add <file>..." to register new files)')
 
     # Print changes
-    if changes['new_files']:
+    if changes["new_files"]:
         status = "new file:"
-        for file in sorted(changes['new_files']):
+        for file in sorted(changes["new_files"]):
             console.print(f"        [red]{status.ljust(11)} {file}[/]")
-    
-    if changes['modified']:
+
+    if changes["modified"]:
         status = "modified:"
-        for file in sorted(changes['modified']):
+        for file in sorted(changes["modified"]):
             console.print(f"        [red]{status.ljust(11)} {file}[/]")
-    
-    if changes['removed']:
+
+    if changes["removed"]:
         status = "removed:"
-        for file in sorted(changes['removed']):
+        for file in sorted(changes["removed"]):
             console.print(f"        [red]{status.ljust(11)} {file}[/]")
-    
+
     if not any(changes.values()):
         console.print("\n[green]No changes detected.[/]")
 
@@ -90,7 +88,7 @@ def status():
 
 
 @app.command
-def report(option: Literal["list", "info", "run"], rpt_name: str="", **kwargs):
+def report(option: Literal["list", "info", "run"], rpt_name: str = "", *args, **kwargs):
     """Execute a report by report class name with kwargs.
     Use `report-info <report name>` for details about a report.
     """
@@ -112,10 +110,11 @@ def report(option: Literal["list", "info", "run"], rpt_name: str="", **kwargs):
 
     if option == "run":
         console.print(f"Running report: {rpt_name}...")
+        console.print(f"        (args={args})")
         console.print(f"        (kwargs={kwargs})")
         console.print("        ...", end="\r")
         try:
-            rpt.run(**kwargs)
+            rpt.run(*args, **kwargs)
             console.print(f"        Exported results to '{rpt.out_path}'")
         except Exception as e:
             console.print(f"        [red]Failed: {e}")
@@ -123,7 +122,9 @@ def report(option: Literal["list", "info", "run"], rpt_name: str="", **kwargs):
 
 
 @app.command
-def task(option: Literal["list", "add", "remove"], name: str="", when: str="") -> None:
+def task(
+    option: Literal["list", "add", "remove"], name: str = "", when: str = ""
+) -> None:
     """Task-control (WIP).
     Schedule recurring data tasks ...or something.
     """
@@ -138,16 +139,17 @@ def task(option: Literal["list", "add", "remove"], name: str="", when: str="") -
 
 
 @app.command
-def update(datasource_name: str, force: bool=False, skip_db: bool=False):
+def update(datasource_name: str, force: bool = False, skip_db: bool = False):
     """Updates datasource by name, or all configured datasources ('.').
     Alternatively, update only the data warehouse using 'db'.
     """
-    #if datasource_name[0].islower
+    # if datasource_name[0].islower
     if datasource_name.lower() in ("db",):
         datasources = []
-    else:    
+    else:
         datasources: list[bolt.datasources.Datasource] = (
-            [getattr(bolt.datasources, datasource_name)] if datasource_name != "."
+            [getattr(bolt.datasources, datasource_name)]
+            if datasource_name != "."
             else DATASOURCES
         )
 
@@ -176,7 +178,9 @@ def update(datasource_name: str, force: bool=False, skip_db: bool=False):
     else:
         console.print("\nUpdating database:")
         try:
-            tables_loaded, sql_file_count, compact_msg = bolt.datasources.warehouse.update_db(compact_db=True)
+            tables_loaded, sql_file_count, compact_msg = (
+                bolt.datasources.warehouse.update_db(compact_db=True)
+            )
             console.print(f"        [green]Updated: {WAREHOUSE}[/]")
             console.print(f"            Tables Loaded: {tables_loaded}")
             console.print(f"            SQL Files Executed: {sql_file_count}")

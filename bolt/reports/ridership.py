@@ -1,4 +1,5 @@
 """NTD Monthly Report."""
+
 from pathlib import Path
 from typing import Literal
 
@@ -8,14 +9,14 @@ from sqlalchemy import text
 from bolt.datasources import warehouse
 
 
-class MonthlyRidership():  # TODO: Report obj
+class MonthlyRidership:  # TODO: Report obj
     def __init__(self):
-        self.data: pd.DataFrame|None = None
+        self.data: pd.DataFrame | None = None
         self.out_path: Path = Path(r"C:\Workspace\tmpdb\Reports\ParaNoShows")
 
     def run(self, ymth: int, mode: Literal["MB", "DR"]):
         """Execute the NTD Monthly report.
-        
+
         Args:
             ymth: (int) The target year-month to get data for
             mode: (Literal["DR", "MB"]) The transit mode to get data for
@@ -37,14 +38,14 @@ class MonthlyRidership():  # TODO: Report obj
         return
 
 
-class QuarterlyRidership():  # TODO: Report obj
+class QuarterlyRidership:  # TODO: Report obj
     def __init__(self):
-        self.data: pd.DataFrame|None = None
+        self.data: pd.DataFrame | None = None
         self.out_path: Path = Path(r"C:\Workspace\tmpdb\Reports\ParaNoShows")
 
     def run(self, ymth: int, mode: Literal["MB", "DR"]):
         """Execute the NTD Monthly report.
-        
+
         Args:
             ymth: (int) The target year-month to get data for
             mode: (Literal["DR", "MB"]) The transit mode to get data for
