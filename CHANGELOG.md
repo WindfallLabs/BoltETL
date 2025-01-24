@@ -17,6 +17,13 @@ Datasource Objects:
 - [/] `ride_requests.py:RideRequests`
 - [/] `rider_accounts.py:RiderAccounts`
 - [/] `via_s10.py:S10`
+- [ ] Command-line utility
+    - [ ] `python bolt-cmd.py status`
+    - [ ] `python bolt-cmd.py add [<filename>|"."]`
+    - [ ] `python bolt-cmd.py update`
+    - [ ] `python bolt-cmd.py report [list|info|run] <report> <kwargs>`
+    - [ ] `python bolt-cmd.py ftp-push <filename>`
+    
 
 Reports:
 - [ ] Report runner task (`invoke report <report name>`)
@@ -66,6 +73,11 @@ Changed:
 - Cleaner types module
 - Refactored 'ParatransitNoShows' report
 - Migrating from 'invoke' to 'cyclopts' for cmd scripts (see added functionality)
+- Migrated a bunch of code from the `ParatransitNoShow` report to the `RideRequests.transform` method
+    - Fixed datetime type issues causing Penalty Points math
+
+Removed:
+- init function replaced with standard `__init__` and `super()`
 
 
 ## [0.0.2] - 2025-01-08

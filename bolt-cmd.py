@@ -21,6 +21,8 @@ WAREHOUSE = "data_warehouse.duckdb"
 
 DATASOURCES: list[bolt.datasources.Datasource] = []
 for ds in bolt.config.metadata.keys():
+    if not isinstance(ds, bolt.datasources.Datasource):
+        continue
     try:
         DATASOURCES.append(getattr(bolt.datasources, ds))
     except AttributeError:
@@ -111,7 +113,7 @@ def report(option: Literal["list", "info", "run"], rpt_name: str="", **kwargs):
     if option == "run":
         console.print(f"Running report: {rpt_name}...")
         console.print(f"        (kwargs={kwargs})")
-        console.print(f"        ...", end="\r")
+        console.print("        ...", end="\r")
         try:
             rpt.run(**kwargs)
             console.print(f"        Exported results to '{rpt.out_path}'")
@@ -140,6 +142,7 @@ def update(datasource_name: str, force: bool=False, skip_db: bool=False):
     """Updates datasource by name, or all configured datasources ('.').
     Alternatively, update only the data warehouse using 'db'.
     """
+    #if datasource_name[0].islower
     if datasource_name.lower() in ("db",):
         datasources = []
     else:    
@@ -151,9 +154,9 @@ def update(datasource_name: str, force: bool=False, skip_db: bool=False):
     errors: list[tuple[str, Exception]] = []
     if datasources:
         if force:
-            console.print(f"Updating datasources (force=True):")
+            console.print("Updating datasources (force=True):")
         else:
-            console.print(f"Updating datasources:")
+            console.print("Updating datasources:")
 
         for D in datasources:
             d = D()
@@ -169,9 +172,9 @@ def update(datasource_name: str, force: bool=False, skip_db: bool=False):
     if len(errors) > 0:
         skip_db = True
     if skip_db:
-        console.print(f"\nDatabase update skipped.")
+        console.print("\nDatabase update skipped.")
     else:
-        console.print(f"\nUpdating database:")
+        console.print("\nUpdating database:")
         try:
             tables_loaded, sql_file_count, compact_msg = bolt.datasources.warehouse.update_db(compact_db=True)
             console.print(f"        [green]Updated: {WAREHOUSE}[/]")

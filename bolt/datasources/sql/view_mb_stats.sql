@@ -38,9 +38,9 @@ FROM (
         service || ' Ridership' as "Label",
         "Ridership" as "Value"
     FROM combined_metrics
-    
+
     UNION ALL
-    
+
     -- Revenue Miles
     SELECT
         2 AS Seq,
@@ -48,9 +48,9 @@ FROM (
         service || ' Revenue Miles (Avg)' as "Label",
         "Revenue Miles (Avg)" as "Value"
     FROM combined_metrics
-    
+
     UNION ALL
-    
+
     -- Revenue Hours
     SELECT
         3 AS Seq,
@@ -58,9 +58,9 @@ FROM (
         service || ' Revenue Hours' as "Label",
         "Revenue Hours" as "Value"
     FROM combined_metrics
-    
+
     UNION ALL
-    
+
     -- Passenger Miles
     SELECT
         4 AS Seq,
@@ -68,7 +68,7 @@ FROM (
         service || ' Passenger Miles' as "Label",
         "Passenger Miles" as "Value"
     FROM combined_metrics
-    
+
     UNION ALL
 
     -- Total Vehicle Miles
@@ -92,7 +92,7 @@ FROM (
     FROM ViaS10
 
     UNION ALL
-    
+
     -- Deadhead Miles
     SELECT
         7 AS Seq,
@@ -100,9 +100,9 @@ FROM (
         service || ' Deadhead Miles' as "Label",
         "Deadhead Miles" as "Value"
     FROM combined_metrics
-    
+
     UNION ALL
-    
+
     -- Deadhead Hours
     SELECT
         8 AS Seq,

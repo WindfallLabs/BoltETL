@@ -62,7 +62,7 @@ def load_cache_files(compact_db=False) -> None:
         for i in config.cache_dir.rglob("*.feather"):
             tbl_name = Path(i).name.split(".")[0]
             # Load the feather file as a dataframe
-            df = pd.read_feather(i, dtype_backend="pyarrow")
+            df = pd.read_feather(i, dtype_backend="pyarrow")  # noqa: F841
             # Load the dataframe into DuckDB
             con.sql(f"CREATE OR REPLACE TABLE {tbl_name} AS SELECT * FROM df")  # reads from Python variables I guess?
             tables_loaded += 1
@@ -85,7 +85,11 @@ def execute_sql():
 
 def update_db(compact_db=False) -> tuple[int, str]:
     """Update the DuckDB data warehouse."""
+    # Load data from cached files
     tables_loaded = load_cache_files()
+    # Load misc dataframes
+    #misc_loaded = load_misc_dataframes()  # TODO: implement
+    # Execute SQL from files
     sql_file_count = execute_sql()
     compact_msg = ""
     if compact_db:

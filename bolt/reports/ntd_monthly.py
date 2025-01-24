@@ -2,7 +2,6 @@
 from pathlib import Path
 from typing import Literal
 
-import pandas as pd
 from sqlalchemy import text
 
 from bolt.datasources import warehouse
@@ -11,8 +10,9 @@ from bolt.reports import BaseReport
 
 class NTDMonthly(BaseReport):  # TODO: Report obj
     def __init__(self):
-        self.data: pd.DataFrame|None = None
-        self.out_path: Path = Path(r"C:\Workspace\tmpdb\Reports\ParaNoShows")
+        #self.data: pd.DataFrame|None = None
+        super().__init__()
+        self.out_path: Path = Path(r"C:\Workspace\tmpdb\Reports\NTDMonthly.xlsx")
 
     def run(self, ymth: int, mode: Literal["MB", "DR"]):
         """Execute the NTD Monthly report.
@@ -32,7 +32,8 @@ class NTDMonthly(BaseReport):  # TODO: Report obj
             .compile(compile_kwargs={"literal_binds": True})
         )
         with warehouse.connect() as db:
-            df = db.sql(str(q)).df().convert_dtypes(dtype_backend="pyarrow")
+            print(str(q))
+            self.data[str(ymth)] = db.sql(str(q)).df().convert_dtypes(dtype_backend="pyarrow")
 
-        self.export(df)
+        self.export()
         return

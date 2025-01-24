@@ -57,8 +57,6 @@ class Datasource[T](ABC):
             Doc("DataFrame or GeoDataFrame of processed data (created by `transform` or loaded from cache with `read_cache`)")
         ] = None
 
-        #def init(self) -> None:
-        #    """Loads metadata from config (toml) file."""
         try:
             # TODO: consider pydantic for validation and type casting
             self.metadata = {
@@ -67,9 +65,7 @@ class Datasource[T](ABC):
             }
         except KeyError:
             raise KeyError(f"Name mismatch: '{self.name}' not in config.toml")
-        
-        self.logger.info(f"Initialized {self.name}")
-        #return
+        #self.logger.debug(f"Initialized {self.name}")
 
     @property
     def name(self):
@@ -107,11 +103,12 @@ class Datasource[T](ABC):
             # TODO: would we ever read multiple?
             layer = self.metadata.get("layer", 0)
             self.raw = gpd.read_file(self.source_files[0], layer=layer)
-            self.logger.info(f"Raw {layer} extracted with geopandas")
+            self.logger.debug(f"Extracted raw data ({layer}; with geopandas)")
         else:
             read_func = READERS[ext]
             self.raw = [(p, read_func(p, dtype_backend="pyarrow")) for p in self.source_files]
-            self.logger.info(f"Raw data extracted")
+            self.logger.debug("Extracted raw data")
+        # TODO: self.logger.debug("Raw files loaded: 8/8")
         return
 
     @abstractmethod
@@ -129,11 +126,11 @@ class Datasource[T](ABC):
     def write_cache(self, *args, **kwargs) -> None:
         """How to cache processed data."""
         self.data.to_feather(self.cache_path, *args, **kwargs)
-        self.logger.info(f"Cache file written: {self.cache_path}")
+        self.logger.info(f"Wrote cache file: {self.cache_path}")
         metadata = self.cache_metadata()
-        self.logger.info(f"Metadata (processed_by): {metadata.processed_by}")
-        self.logger.info(f"Metadata (version): {metadata.datasource_version}")
-        self.logger.info(f"Metadata (sources): {metadata.sources}")
+        #self.logger.info(f"Metadata (processed_by): {metadata.processed_by}")
+        #self.logger.info(f"Metadata (version): {metadata.datasource_version}")
+        #self.logger.info(f"Metadata (sources): {metadata.sources}")
         #....
 
         # TODO: dump cache metadata
@@ -158,10 +155,10 @@ class Datasource[T](ABC):
         h = "HASH"  # TODO: file hash/metadata
         if self.metadata.get("load_with_geopandas", False):
             self.data = gpd.read_feather(self.cache_path, *args, **kwargs)  # TODO: convert columns to pyarrow types?
-            self.logger.info(f"Cached file read (with geopandas): {self.version} {h}")
+            #self.logger.info(f"Cached file read (with geopandas): {self.version} {h}")
         else:
             self.data = pd.read_feather(self.cache_path, *args, **kwargs, dtype_backend="pyarrow")
-            self.logger.info(f"Cached file read: {self.version} {h}")  # TODO: file hash
+            #self.logger.info(f"Cached file read: {self.version} {h}")  # TODO: file hash
         
         # Load cache metadata
         # TODO: json.load(.../cached/.metadata/{filename}) -> bolt.config.metadata[filename]

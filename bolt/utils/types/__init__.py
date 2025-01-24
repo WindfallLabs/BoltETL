@@ -11,6 +11,7 @@ from ._pyarrow_types import (
     pyarrow_string,
     pyarrow_time,
     pyarrow_uint16,
+    pyarrow_float32,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "pyarrow_string",
     "pyarrow_time",
     "pyarrow_uint16",
+    "pyarrow_float32"
 ]

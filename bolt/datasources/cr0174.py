@@ -3,6 +3,7 @@ import re
 from typing import Literal
 
 import pandas as pd
+import pyarrow as pa
 
 from bolt.utils import YearMonth
 from . import Datasource
@@ -38,11 +39,11 @@ class CR0174(Datasource):
         df = df[cols]
         # Specify columns to drop
         drop_columns = [
-            "Deadhead Distance (S)",
-            "Deadhead Distance (A)",
+            #"Deadhead Distance (S)",  # TODO: Maybe we don't drop
+            #"Deadhead Distance (A)",
             "Deadhead Distance (I)",
-            "Deadhead Hours (S)",
-            "Deadhead Hours (A)",
+            #"Deadhead Hours (S)",
+            #"Deadhead Hours (A)",
             "Deadhead Hours (I)",
         ]
         # Drop 'em
@@ -52,7 +53,12 @@ class CR0174(Datasource):
         for col in df.columns:
             if col in ["Route", "Weekday", "Service", "YMTH", "Revenue Distance (I)", "Revenue Hours (I)"]:
                 continue
-            df[col] = df[col].astype(str).str.replace(",", "").astype(float)
+            if df[col].dtype is pa.NA:
+                continue
+            try:
+                df[col] = df[col].astype(str).str.replace(",", "").astype(float)
+            except TypeError:
+                df[col] = df[col.astype(float)]
         return df
 
     def transform(self):
@@ -60,5 +66,9 @@ class CR0174(Datasource):
         dfs = []
         for fpath, df in self.raw:
             dfs.append(self.transform_one(fpath, df))
-        self.data = pd.concat(dfs).reset_index(drop=True)
+        df = pd.concat(dfs).reset_index(drop=True)
+        # Add cols
+        df["Pull-In/Out Speed (S)"] = (df["Pull-In/Out Distance (S)"] / df["Pull-In/Out Hours (S)"]).round(3)
+        df["Pull-In/Out Speed (A)"] = (df["Pull-In/Out Distance (A)"] / df["Pull-In/Out Hours (A)"]).round(3)
+        self.data = df
         return

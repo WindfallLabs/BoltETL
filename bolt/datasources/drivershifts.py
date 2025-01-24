@@ -1,7 +1,7 @@
 """DriverShifts report from Via"""
 import pandas as pd
 
-from bolt.utils import YearMonth, types
+from bolt.utils import YearMonth
 from . import Datasource
 
 

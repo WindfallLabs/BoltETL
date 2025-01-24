@@ -1,14 +1,11 @@
 import datetime as dt
-from collections import OrderedDict
 from pathlib import Path
 
 import pandas as pd
-from rich.console import Console
 
 from bolt.datasources import RideRequests, RiderAccounts  # Report
 from bolt.reports import BaseReport
 
-console = Console()
 
 # Minutes not considered late
 GRACE_ARRIVAL_MINS = 4
@@ -29,68 +26,50 @@ class ParatransitNoShows(BaseReport):
         end = dt.datetime.strptime(end.replace("-", ""), "%Y%m%d")
         self.logger.info(f"Processing data from {start} to {end}")
 
+        # Read Ride Requests
+        # Changed as of 2025-01-24: Most of the field-creation and calcs were
+        #  moved to the RideRequests.transform() method
         req = RideRequests().read_cache()
+        req_df = req.data.copy()
         self.logger.info(f"Loaded RideRequests ({req.version})")
+        req_df = (
+            req_df[
+                # Filter by date range
+                (req_df["Requested Pickup Time"] >= start)
+                & (req_df["Requested Pickup Time"] <= end)
+            ].reset_index(drop=True)
+        )
+        self.logger.info(f"Filtered RideRequests to date range and Late/No-Show")
+
+        # Update 'Cancel' values to 'Late Cancel' in "Request Status"
+        req_df.loc[req_df["Late Cancellation"] == "Y", "Request Status"] = "Late Cancel"
+        self.logger.info("Updated 'Request Status' values of 'Cancel' to 'Late Cancel'")
+
+        # Add Penalty Points
+        req_df["Penalty Points"] = 0
+        self.logger.info("Added 'Penalty Points' column")
+        req_df.loc[
+            # For any Late Cancellation or No Show record...
+            (
+                (req_df["Late Cancellation"] == "Y")
+                | (req_df["Request Status"] == "No Show")
+            ),
+            # ...set the Penalty Points to 1
+            "Penalty Points"] = 1
+
+        # Read Rider Accounts
         acc = RiderAccounts().read_cache()
         self.logger.info(f"Loaded RiderAccounts ({acc.version})")
+
+        # Combine
         df = pd.merge(
             # Ride Requests
-            req.data,
+            req_df,
             # Rider Accounts
             acc.data,
             how="left",
             on="Rider ID"
         )
-
-        df = df[
-            (df["Requested Pickup Time"] >= start)
-            & (df["Requested Pickup Time"] <= end)
-            ].reset_index()
-        # Assign Penalty Points
-        df["Penalty Points"] = 0
-
-        # No-show rule/query
-        no_show = df["Request Status"] == "No Show"
-
-        # Late Cancellation (cancelled <2 hours before ride shows up, unexcused)
-        excused_reasons = [
-            "appointment_change",
-            "cancel_not_rider",
-            "Cancel – rider not at fault",  # NOTE: dash char
-            "other"
-            ]
-
-        # Late paratransit cancellation rule/query
-        late_para_cancel = (
-            # Status of "Cancel"
-            (df["Request Status"] == "Cancel")\
-            # Paratransit service
-            & (df["Service"] == "Paratransit")\
-            # Not an excused reason
-            & (~df["Cancellation Reason"].isin(excused_reasons))\
-            # If the cancellation was submitted after 2-hours in advance of scheduled pickup
-            #& ((df["Original Planned Pickup Time"] - df["Cancellation Time"]).dt.total_seconds() / 3600 < 2)
-            & ((df["Original Planned Pickup Time"].fillna(0) - df["Cancellation Time"].fillna(0)).dt.total_seconds() / 3600 < 2)
-        )
-
-        # Late microtransit cancellation rule/query
-        late_micro_cancel = (
-            # Status of "Cancel"
-            (df["Request Status"] == "Cancel")\
-            # Microtransit service
-            & (df["Service"] == "Microtransit")\
-            # Not an excused reason
-            & (~df["Cancellation Reason"].isin(excused_reasons))\
-            # If the cancellation was submitted after 4:30 PM the day before
-            #& (df["Cancellation Time"] >= ((df["Original Planned Pickup Time"] - dt.timedelta(days=1)).dt.normalize() + dt.timedelta(hours=16, minutes=30)))
-            & (df["Cancellation Time"].fillna(0) >= ((df["Original Planned Pickup Time"].fillna(0) - dt.timedelta(days=1)).dt.normalize() + dt.timedelta(hours=16, minutes=30)))
-        )
-
-        # Give no-shows or late-cancellations 1 Penalty Point
-        df.loc[no_show | late_para_cancel | late_micro_cancel, "Penalty Points"] = 1
-
-        # Backup "raw" data
-        self.raw = df.copy()
 
         # Aggregation (group-by or pivot table)
         agg = {
@@ -136,9 +115,6 @@ class ParatransitNoShows(BaseReport):
             & (g["%"] >= 0.1)  # We only need this field here (drop later)
         )
 
-        # Drop the % (float) field
-        #g.drop("%", axis=1, inplace=True)  # moved
-
         # Calculate suspension
         g.loc[suspend, "Suspension"] = "Y"
 
@@ -155,14 +131,19 @@ class ParatransitNoShows(BaseReport):
             "Service",
             "Request Status",
             "Original Planned Pickup Time",
+            "Requested Pickup Time",
             "Cancellation Time",
             "Cancellation Reason",
             "Penalty Points"
         ]
 
         # Proof (dataframe of all records that got penalty points)
-        penalties_df = df[(df["Penalty Points"] > 0)][check_cols].copy()
+        #penalties_df = df[(df["Penalty Points"] > 0)][check_cols].copy()
+        # The "proof" sheet is all rides (within date range) for a user with 1+ penalty points
+        users_with_penalties = set(g[g["Penalty Points"] > 0]["Rider ID"])
+        penalties_df = df[df["Rider ID"].isin(users_with_penalties)][check_cols].copy()
         penalties_df["Request ID"] = penalties_df["Request ID"].astype(str)
+        penalties_df.sort_values(["Last Name", "Requested Pickup Time"], inplace=True)
         # Set to data (order set in __init__)
         self.data["All Penalties"] = penalties_df.copy()
 
