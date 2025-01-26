@@ -20,7 +20,7 @@ class NTDMonthly(Datasource):
         ymth = YearMonth.from_filepath(filepath)
 
         try:
-            # In the case that there's a TOTAL row
+            # In the case that a TOTAL row exists
             drop_idx = int(
                 df.loc[
                     ~df["SERVICE_PERIOD"].str.contains("Weekday|Sunday|Saturday")
@@ -56,38 +56,16 @@ class NTDMonthly(Datasource):
         # Additions
         df["YMTH"] = ymth.yearmonth
 
+        # Rename
         ntd_rename_cols = {
-            "YMTH": "YMTH",
+            #"YMTH": "YMTH",
             "SERVICE_PERIOD": "Service",
             "MTH_BOARD": "Ridership",
             "REV_MILES": "Revenue Miles (Avg)",
             "MTH_REV_HOURS": "Revenue Hours",
             "MTH_PASS_MILES": "Passenger Miles",
         }
-
-        # Fixed Route Stats
-        df = df[ntd_rename_cols.keys()].rename(ntd_rename_cols, axis=1)
-        service_df = sd.get_service_days(ymth.year, ymth.month)
-
-        # Monthly stats
-        weekday_avg_ridership = ceil(
-            df.loc[df["Service"] == "Weekday"]["Ridership"].item()
-            / service_df.loc["Weekday", "Days"].item()
-        )
-        sat_avg_ridership = ceil(
-            df.loc[df["Service"] == "Saturday"]["Ridership"].item()
-            / service_df.loc["Saturday", "Days"].item()
-        )
-        sun_avg_ridership = ceil(
-            df.loc[df["Service"] == "Sunday"]["Ridership"].item()
-            / service_df.loc["Sunday", "Days"].item()
-        )
-        df["Avg Daily Ridership"] = 0.0
-        df.loc[df["Service"] == "Weekday", "Avg Daily Ridership"] = (
-            weekday_avg_ridership
-        )
-        df.loc[df["Service"] == "Saturday", "Avg Daily Ridership"] = sat_avg_ridership
-        df.loc[df["Service"] == "Sunday", "Avg Daily Ridership"] = sun_avg_ridership
+        df.rename(ntd_rename_cols, axis=1, inplace=True)
 
         return df
 
@@ -96,5 +74,17 @@ class NTDMonthly(Datasource):
         dfs = []
         for fpath, df in self.raw:
             dfs.append(self.transform_one(fpath, df))
-        self.data = pd.concat(dfs).reset_index(drop=True)
+        df = pd.concat(dfs).reset_index(drop=True)
+
+        # Join with service days
+        sdays = sd.get_service_days_many(set(df["YMTH"])).reset_index()
+        sdays.rename({"ServiceType": "Service"}, axis=1, inplace=True)
+        sdays.drop("Holiday", axis=1, inplace=True)
+        df = pd.merge(df, sdays, on=["YMTH", "Service"])
+
+        df["Revenue Miles (Total)"] = df["Revenue Miles (Avg)"] * df["Days"]  # Un-Averaged
+        df["Avg Daily Ridership"] = (df["Ridership"] / df["Days"]).apply(lambda x: ceil(x) * 1.0)
+
+        # Return final data
+        self.data = df
         return

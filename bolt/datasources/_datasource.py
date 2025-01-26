@@ -82,7 +82,7 @@ class Datasource[T](ABC):
             str(p.absolute())
             for p in Path(self.metadata["source_dir"]).rglob(self.metadata["filename"])
             # Ignore source / raw files that start with "_"
-            if not p.name.startswith("_")
+            if not p.name.startswith("_") and not p.name.startswith("~")
         ]
 
     @property

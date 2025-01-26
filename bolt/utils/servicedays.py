@@ -133,7 +133,25 @@ def get_service_days(year: int, month: int) -> pd.DataFrame:
         .count()
         .rename({"DayName": "Days"}, axis=1)
     )
+    # Add closed count (0) for year-months that don't have them
+    if "Closed" not in df.index:
+        df.loc["Closed"] = (0, 0)
+    # Add Total row
     df.loc["Total"] = df.sum()
     # Display the target time period (yearmonth)
     df.columns.name = str(year) + str(month).zfill(2)
     return df
+
+
+def get_service_days_many(year_months: list[int]) -> pd.DataFrame:
+    """Counts the number of days by service type for multiple year-months."""
+    dfs = []
+    for i in set(year_months):
+        year = int(str(i)[:4])
+        month = int(str(i)[4:])
+        df = get_service_days(year, month)
+        df["YMTH"] = i
+        dfs.append(df)
+    x = pd.concat(dfs).reset_index().set_index("YMTH")
+    x.columns.name = None
+    return x

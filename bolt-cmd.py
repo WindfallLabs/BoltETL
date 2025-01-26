@@ -19,12 +19,9 @@ WAREHOUSE = "data_warehouse.duckdb"
 
 DATASOURCES: list[bolt.datasources.Datasource] = []
 for ds in bolt.config.metadata.keys():
-    if not isinstance(ds, bolt.datasources.Datasource):
-        continue
-    try:
-        DATASOURCES.append(getattr(bolt.datasources, ds))
-    except AttributeError:
-        pass
+    DS = getattr(bolt.datasources, ds, None)
+    if DS and issubclass(DS, bolt.datasources.Datasource):
+        DATASOURCES.append(DS)
 
 REPORTS: list = []
 
@@ -142,16 +139,18 @@ def task(
 def update(datasource_name: str, force: bool = False, skip_db: bool = False):
     """Updates datasource by name, or all configured datasources ('.').
     Alternatively, update only the data warehouse using 'db'.
+    Examples:
+        `python bolt-cmd.py update .`  # updates everything
+        `python bolt-cmd.py update db`  # updates only the database
+        `python bolt-cmd.py update <datasource>`  # updates <datasource>
     """
-    # if datasource_name[0].islower
-    if datasource_name.lower() in ("db",):
+    datasources: list[bolt.datasources.Datasource] | None = None
+    if datasource_name == ".":
+        datasources = DATASOURCES
+    elif datasource_name.lower() == "db":
         datasources = []
     else:
-        datasources: list[bolt.datasources.Datasource] = (
-            [getattr(bolt.datasources, datasource_name)]
-            if datasource_name != "."
-            else DATASOURCES
-        )
+        datasources = [getattr(bolt.datasources, datasource_name)]
 
     errors: list[tuple[str, Exception]] = []
     if datasources:
