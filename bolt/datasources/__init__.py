@@ -1,23 +1,14 @@
 from . import warehouse
 from ._datasource import Datasource
-from .county4 import County4
-from .cr0174 import CR0174
-from .drivershifts import DriverShifts
-from .parcels import Parcels
-from .rcp_ntd_monthly import NTDMonthly
-from .ride_requests import RideRequests
-from .rider_accounts import RiderAccounts
-from .via_s10 import ViaS10
+from ..utils import config
+
+import sys
+sys.path.append(str(config.data_dir))
+
+# Assuming that the user-defined `__datasources__` module exists in `data_dir`
+from __datasources__ import *
 
 __all__ = [
     "Datasource",
-    "County4",
-    "CR0174",
-    "DriverShifts",
-    "Parcels",
-    "NTDMonthly",
-    "RiderAccounts",
-    "RideRequests",
-    "ViaS10",
     "warehouse",
 ]

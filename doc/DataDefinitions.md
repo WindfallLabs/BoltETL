@@ -3,6 +3,9 @@
 ## Folder Schema and Organization Guidelines
 
 - `/Data` - parent folder; entry point for all data used by the agency
+    - `/__datasources__` - A Python module (contains an `__init__.py`) that defines the custom, user-defined subclasses of `bolt.datasources.Datasource`
+        - Deletion: Not considered delete-safe. _Should be version-controled with git!_ (or similar)
+        - Use: BoltETL loads custom Datasource classes from this location.
     - `/raw` - Contains (raw/unprocessed) data, often downloaded from external sources
         - Deletion: Not considered delete-safe, since getting raw data again might be a pain
         - Use: Primarily for machine-use/automations, Data may and may not be intended for human users

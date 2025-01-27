@@ -37,6 +37,8 @@ To-Do:
 - [ ] Match RCP and Via NTD schemas
 - [ ] Schema (raw and final) dump-to-txt method; or dump to JSON
 - [ ] Ditch `invoke` and replace with `click`
+- [X] Remove all agency-specific `Datasource` subclasses
+- [ ] Remove all agency-specific `Report` subclasses
 
 
 ## v1.0.0 Feature Checklist
