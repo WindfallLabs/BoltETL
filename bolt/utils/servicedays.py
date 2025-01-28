@@ -155,3 +155,17 @@ def get_service_days_many(year_months: list[int]) -> pd.DataFrame:
     x = pd.concat(dfs).reset_index().set_index("YMTH")
     x.columns.name = None
     return x
+
+
+def add_service_days(df: pd.DataFrame, ymth_col: str = "YMTH", service_col: str = "Service"):
+    """Adds a new 'Service Days' column to a DataFrame given a Year-Month
+    column and 'Service' column."""
+    df = df.copy()
+    service_df = (
+        get_service_days_many(set(df[ymth_col]))
+        .rename({"Days": "Service Days"}, axis=1)
+        .reset_index().rename({"ServiceType": service_col}, axis=1)
+        .drop("Holiday", axis=1)
+    )
+    df = pd.merge(df, service_df, on=[ymth_col, service_col])
+    return df

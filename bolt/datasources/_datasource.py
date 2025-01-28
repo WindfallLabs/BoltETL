@@ -2,10 +2,11 @@
 
 import datetime as dt
 from abc import ABC, abstractmethod
+from functools import wraps
 from getpass import getuser
 from pathlib import Path
 from platform import node
-from typing import Annotated
+from typing import Annotated, Callable
 
 import geopandas as gpd
 import pandas as pd
@@ -56,6 +57,8 @@ class Datasource[T](ABC):
                 "DataFrame or GeoDataFrame of processed data (created by `transform` or loaded from cache with `read_cache`)"
             ),
         ] = None
+
+        self.is_enriched: bool = False
 
         try:
             # TODO: consider pydantic for validation and type casting
@@ -120,7 +123,16 @@ class Datasource[T](ABC):
         """Defines how raw data is transformed (processed/cleaned)."""
         # df = ...
         # self.data = df
-        return
+        pass
+
+    def enrich(self) -> None:  # optional abstract method
+        """Define how the transformed data is enriched."""
+        pass
+
+    def _enrich(self) -> None:
+        result = self.enrich()
+        self.is_enriched = True
+        return result  # probably None
 
     def load(self, dst: Engine, *args, **kwargs):  # TODO: what is this good for?
         """Defines how the the processed data is loaded into a target database."""
@@ -176,14 +188,16 @@ class Datasource[T](ABC):
         """Describe the rules that the data must adhere to before exported via `load`."""
         pass
 
-    def update(self):
-        """Convenience method to combine Extract, Transform, and Cache methods."""
+    def update(self, enrich=True):
+        """Convenience method to combine Extract, Transform, Enrich, and Cache methods."""
         self.logger.info("Beginning full update process")
         if hasattr(self, "download"):
             self.logger.info("'download' method found and running")
             self.download()
         self.extract()
         self.transform()
+        if enrich:
+            self._enrich()
         self.write_cache()
         self.logger.info("Update complete")
         return
