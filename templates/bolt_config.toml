@@ -1,0 +1,62 @@
+# ============================================================================
+# Global Config Options
+[global]
+
+# The directory to read/write data
+# This folder must contain a __datasources__ folder that contains
+# - An __init__.py file
+# - Various custom subclasses of `bolt.datasources.Datasource`
+data_dir = "C:\\BoltData\\Data"
+
+# The directory to read/write reports
+# This folder must contain a __reports__ folder that contains
+# - An __init__.py file
+# - Various custom subclasses of `bolt.ReportBase`
+report_dir = "C:\\BoltData\\Reports"
+
+# The directory to load SQL files (views)
+sql_dir = "C:\\BoltData\\Data\\__datasources__\\sql"
+
+# The directory to read/write cached data
+cache_dir = "C:\\BoltData\\Data\\cached"
+
+# The directory to write log files
+log_dir = "C:\\BoltData\\.logs"
+
+# The path to the "data_inventory.json" file
+inv_path = "C:\\BoltData\\data_inventory.json"
+
+# Coordinate Reference System to reproject spatial data to
+crs = "epsg:6515"
+
+
+# ============================================================================
+# Datasources
+## See 'DataDefinitions.md' for documentation
+
+# [metadata.Parcels]
+# name = "Parcels"
+# desc = """Missoula County Parcel Data.
+#   NOTES:
+#     Prefer GDB to shapefile to preserve field names."""
+# source_dir = "C:\\BoltData\\Data\\raw\\MSL - Missoula Parcels"
+# filename = "Missoula_Parcels.gdb"
+# provider = "Montana State Library | Montana Dept of Revenue"
+# source_url = "http://ftpgeoinfo.msl.mt.gov/Data/Spatial/MSDI/Cadastral/Parcels/Missoula/Missoula_GDB.zip"
+# load_with_geopandas = true
+
+
+# [metadata.CR0004]
+# name = "CR0004"
+# #desc = """N/A"""
+# source_dir = "C:\\BoltData\\Data\\raw\\CR - CR0004"
+# filename = "*CR-0004*.csv"
+# provider = "CleverReports"
+
+
+# [metadata.RideRequests]
+# name = "RideRequests"
+# #desc = """N/A"""
+# source_dir = "C:\\BoltData\\Data\\raw\\Via - Ride Requests"
+# filename = "*-Ride Requests*.xlsx"
+# provider = "Via"

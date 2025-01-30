@@ -1,5 +1,4 @@
 """Type casting functions."""
-
 import geopandas as gpd
 import pandas as pd
 import pyarrow as pa
@@ -50,31 +49,6 @@ def cast_df_to_pyarrow(df, schema: dict[pd.ArrowDtype, list[str]], create_missin
             df[col_name] = df[col_name].astype(arrow_type)
 
     return df
-
-# WIP
-'''
-def cast_ints(df: pd.DataFrame|gpd.GeoDataFrame) -> pd.DataFrame|gpd.GeoDataFrame:
-    """Casts """
-    df = df.copy()
-    for col in df.columns:
-        dtype_name = df[col].dtype.name
-        vals = df[col].dropna()
-        
-        try:
-            # Ints
-            if all(df[col].dropna().apply(lambda x: float(x).is_integer())) is True:
-                if vals.min() >= 0:
-                    dtype_name = "uint"
-                else:
-                    dtype_name = "int"
-            else:
-                dtype = pd.ArrowDtype(pa.float32())
-        
-            df[col] = df[col].astype(dtype)
-
-        except Exception:
-            continue
-'''
 
 
 def to_int(s: str) -> int:

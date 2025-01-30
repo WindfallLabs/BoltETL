@@ -1,8 +1,9 @@
+import os
 from pathlib import Path
 
 import toml
 
-CONFIG_PATH = r"C:\Workspace\tmpdb\.BoltETL\config.toml"
+CONFIG_PATH = Path(os.environ["BOLT-CONFIG"])
 
 
 class Config:

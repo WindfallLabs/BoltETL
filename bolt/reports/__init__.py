@@ -1,13 +1,8 @@
 from ._report import BaseReport
-from .ntd_monthly import NTDMonthly
-from .para_noshows import ParatransitNoShows
-from .ridership import MonthlyRidership, QuarterlyRidership
+from ..utils import config
 
-__all__ = [
-    "BaseReport",
-    "MonthlyRidership",
-    "NTDMonthly",
-    "ParatransitNoShows",
-    "QuarterlyRidership",
-    # ...
-]
+import sys
+sys.path.append(str(config.report_dir))
+
+# Assuming that the user-defined `__datasources__` module exists in `report_dir`
+from __reports__ import *

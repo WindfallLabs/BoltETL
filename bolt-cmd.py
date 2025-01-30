@@ -1,3 +1,5 @@
+import time
+import datetime as dt
 from fnmatch import fnmatch
 from pathlib import Path
 from typing import Literal
@@ -7,6 +9,9 @@ from rich.console import Console
 
 import bolt
 from bolt.utils.file_tracker import FileTracker
+
+__version__ = "0.0.3-dev"
+t_start = time.time()  # Start process timer
 
 console = Console()
 app = cyclopts.App()
@@ -96,6 +101,9 @@ def report(option: Literal["list", "info", "run"], rpt_name: str = "", *args, **
             console.print(f"        [blue]{rpt_name}[/]")
         return
 
+    # TODO: consider an '--update' flag to update report dependencies
+    # e.g. python bolt-cmd.py report run ParatransitNoShows --update
+
     if not rpt_name:
         raise AttributeError("'rpt_name' argument is required")
 
@@ -154,39 +162,45 @@ def update(datasource_name: str, force: bool = False, skip_db: bool = False):
 
     errors: list[tuple[str, Exception]] = []
     if datasources:
+        update_msg = "Updating datasources:"
         if force:
-            console.print("Updating datasources (force=True):")
-        else:
-            console.print("Updating datasources:")
+            update_msg = "Updating datasources (force=True):"
+        console.print(update_msg)
 
         for D in datasources:
             d = D()
-            console.print(f"        {d.name}...", end="\r")
-            try:
-                d.update()
-                console.print(f"        [green]Updated: {d.name}[/]")
-            except Exception as e:
-                errors.append((d.name, e))
-                console.print(f"        [red]Failed: {d.name}[/]")
+            with console.status(f"      Updating {d.name}..."):
+                try:
+                    d.update()
+                    msg = f"        [green]Updated: {d.name}[/]"
+                except Exception as e:
+                    errors.append((d.name, e))
+                    msg = f"        [green]Updated: {d.name}[/]"
+            console.print(msg)
 
     # Update database
+    console.print("Updating database:")
     if len(errors) > 0:
-        skip_db = True
+        skip_db = True  # Override the skip_db flag
+
     if skip_db:
-        console.print("\nDatabase update skipped.")
+        console.print("        [yellow]Skipped[/].")
     else:
-        console.print("\nUpdating database:")
-        try:
-            tables_loaded, sql_file_count, compact_msg = (
-                bolt.datasources.warehouse.update_db(compact_db=True)
-            )
-            console.print(f"        [green]Updated: {WAREHOUSE}[/]")
-            console.print(f"            Tables Loaded: {tables_loaded}")
-            console.print(f"            SQL Files Executed: {sql_file_count}")
-            console.print(f"            {compact_msg}")
-        except Exception as e:
-            errors.append((WAREHOUSE, e))
-            console.print(f"        [red]Failed: {WAREHOUSE}[/]")
+        with console.status("Updating database:"):
+            try:
+                tables_loaded, sql_file_count, compact_msg = (
+                    bolt.warehouse.update_db(compact_db=True)
+                )
+                db_msg = (
+                    f"        [green]Updated: {WAREHOUSE}[/]\n"
+                    f"            Tables Loaded: {tables_loaded}\n"
+                    f"            SQL Files Executed: {sql_file_count}\n"
+                    f"            {compact_msg}"
+                )
+            except Exception as e:
+                errors.append((WAREHOUSE, e))
+                db_msg = f"        [red]Failed: {WAREHOUSE}[/]"
+        console.print(db_msg)
 
     console.print(f"\nErrors: {len(errors)}")
     for name, err in errors:
@@ -196,6 +210,16 @@ def update(datasource_name: str, force: bool = False, skip_db: bool = False):
 
 if __name__ == "__main__":
     try:
+        # Initial blank line and app info
+        console.print(f"\nBoltCMD ([b blue]v{__version__}[/])")
         app()
     except Exception:
         console.print_exception()
+    finally:
+        t_end = time.time()
+        t = dt.timedelta(seconds=t_end-t_start)
+        min = int(t.total_seconds() // 60)
+        sec = t.total_seconds() % 60
+        t_msg = f"{min}:{sec:.2f}"
+        #t_msg = f"{tot_seconds/60:.2f} minutes" if tot_seconds > 100 else f"{tot_seconds:.2f} seconds"
+        console.print(f"[white](Time: {t_msg})[/]")

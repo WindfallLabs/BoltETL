@@ -1,4 +1,3 @@
-from . import warehouse
 from ._datasource import Datasource
 from ..utils import config
 
@@ -10,5 +9,4 @@ from __datasources__ import *
 
 __all__ = [
     "Datasource",
-    "warehouse",
 ]
