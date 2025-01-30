@@ -79,6 +79,13 @@ provider = "Montana State Library"
 URI = "mssql+pyodbc://localhost\\SQLEXPRESS/County4?trusted_connection=yes&driver=ODBC+Driver+17+for+SQL+Server"
 
 
+[metadata.CR0004]
+name = "CR0004"
+#desc = """N/A"""
+source_dir = "C:\\Workspace\\tmpdb\\Data\\raw\\CR - CR0004"
+filename = "*CR-0004*.csv"
+provider = "CleverReports"
+
 
 [metadata.CR0174]
 name = "CR0174"

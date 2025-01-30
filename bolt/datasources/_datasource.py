@@ -129,7 +129,7 @@ class Datasource[T](ABC):
         """Define how the transformed data is enriched."""
         pass
 
-    def _enrich(self) -> None:
+    def _enrich(self) -> None:  # TODO: replace this with a metadata flag
         result = self.enrich()
         self.is_enriched = True
         return result  # probably None

@@ -148,11 +148,12 @@ class ParatransitNoShows(BaseReport):
         ]
 
         # Proof (dataframe of all records that got penalty points)
-        # penalties_df = df[(df["Penalty Points"] > 0)][check_cols].copy()
+        penalties_df = df[(df["Penalty Points"] > 0)][check_cols].copy()
         # The "proof" sheet is all rides (within date range) for a user with 1+ penalty points
-        users_with_penalties = set(g[g["Penalty Points"] > 0]["Rider ID"])
-        penalties_df = df[df["Rider ID"].isin(users_with_penalties)][check_cols].copy()
-        penalties_df["Request ID"] = penalties_df["Request ID"].astype(str)
+        # This is the part Wyatt didn't care for
+        #users_with_penalties = set(g[g["Penalty Points"] > 0]["Rider ID"])
+        #penalties_df = df[df["Rider ID"].isin(users_with_penalties)][check_cols].copy()
+        #penalties_df["Request ID"] = penalties_df["Request ID"].astype(str)
         penalties_df.sort_values(["Last Name", "Requested Pickup Time"], inplace=True)
         # Set to data (order set in __init__)
         self.data["All Penalties"] = penalties_df.copy()

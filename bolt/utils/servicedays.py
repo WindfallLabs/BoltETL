@@ -6,6 +6,7 @@ of any given year and month.
 """
 
 import calendar
+import collections
 import datetime as dt
 import warnings
 from itertools import cycle
@@ -100,6 +101,13 @@ def get_month_days(year: int, month: int) -> pd.DataFrame:
         columns=["Date", "DayName"],
     ).set_index("Date")
     return df
+
+
+def get_weekday_count(year: int, month: int) -> dict[str, int]:
+    """Return a dict of day name and the count of those days in the given month."""
+    month_days: pd.Series = get_month_days(year, month)["DayName"]
+    cnts: dict[str, int] = dict(collections.Counter(month_days))
+    return cnts
 
 
 def get_full_calendar(year: int, month: int, drop_observed=False) -> pd.DataFrame:

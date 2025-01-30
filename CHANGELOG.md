@@ -18,16 +18,16 @@ Datasource Objects:
 - [/] `rider_accounts.py:RiderAccounts`
 - [/] `via_s10.py:S10`
 - [ ] Command-line utility
-    - [ ] `python bolt-cmd.py status`
-    - [ ] `python bolt-cmd.py add [<filename>|"."]`
-    - [ ] `python bolt-cmd.py update`
-    - [ ] `python bolt-cmd.py report [list|info|run] <report> <kwargs>`
+    - [/] `python bolt-cmd.py status`
+    - [/] `python bolt-cmd.py add [<filename>|"."]`
+    - [/] `python bolt-cmd.py update`
+    - [x] `python bolt-cmd.py report [list|info|run] <report> <kwargs>`
     - [ ] `python bolt-cmd.py ftp-push <filename>`
     
 
 Reports:
 - [ ] Report runner task (`invoke report <report name>`)
-- [/] No-Show Report (bi-monthly)
+- [x] No-Show Report (bi-monthly)
 - [ ] Monthly Ridership Report
 
 To-Do:
@@ -36,8 +36,8 @@ To-Do:
 - [ ] Populated `load` methods?
 - [ ] Match RCP and Via NTD schemas
 - [ ] Schema (raw and final) dump-to-txt method; or dump to JSON
-- [ ] Ditch `invoke` and replace with `click`
-- [X] Remove all agency-specific `Datasource` subclasses
+- [/] Ditch `invoke` and replace with `click`
+- [x] Remove all agency-specific `Datasource` subclasses
 - [ ] Remove all agency-specific `Report` subclasses
 
 
