@@ -2,9 +2,9 @@
 _Author: Garin Wally; 2024-12-09_
 _Developed with love and support from the Missoula Urban Transit District_
 
-BoltETL is a data-processing utility and [ETL](https://en.wikipedia.org/wiki/Extract,_transform,_load) framework intended for solo data analysts and small teams. Built with [pandas](https://pandas.pydata.org/) and Python (one of the world's [most popular](https://spectrum.ieee.org/top-programming-languages-2024) programming languages).
+BoltETL is a data-processing utility and [ETL](https://en.wikipedia.org/wiki/Extract,_transform,_load) framework intended for solo data analysts and small teams. Currently built with [pandas](https://pandas.pydata.org/) (until I'm more comfortable with [polars](https://pola.rs/)) and Python (one of the world's [most popular](https://spectrum.ieee.org/top-programming-languages-2024) programming languages).
 
-Transform diverse data sources into standardized, Pythonic objects through custom `Datasource` classes and a simple [TOML](https://toml.io/en/) configuration file - whether you're working with Excel reports, CSV files, or spatial data; and define exactly how your data is retrieved, updated, validated, and exported. Leverage high-performance caching to/from the "feather" filetype for both spatial and non-spatial data. Enjoy the simplicity of running your data-tasks using a well-documented-and dead-simple command line utility. No containers, no web servers, no enterprise infrastructure, just Python.
+Transform diverse data sources into standardized, Pythonic objects through custom `Datasource` classes and a simple [TOML](https://toml.io/en/) configuration file - whether you're working with Excel reports, CSV files, or spatial data. Define exactly how your data is retrieved, updated, validated, and exported. Leverage high-performance "feather" and DuckDB filetypes for storing and caching both spatial and non-spatial data. Enjoy the simplicity of running your data-tasks using a well-documented-and dead-simple command line utility. No containers, no web servers, no enterprise infrastructure, just Python.
 
 BoltETL is:
 - Flexible, single-tool data solution
