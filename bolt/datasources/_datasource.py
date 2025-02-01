@@ -10,6 +10,7 @@ from typing import Annotated, Callable
 
 import geopandas as gpd
 import pandas as pd
+import polars as pl
 from pydantic import BaseModel
 from sqlalchemy import Engine
 from typing_extensions import Doc
@@ -19,9 +20,15 @@ from bolt.utils import config, make_logger, version
 SUPPORTED_CACHE_TYPES = ("DISABLE", "feather")
 
 READERS = {
-    "xlsx": pd.read_excel,
-    "csv": pd.read_csv,
+    #"xlsx": pd.read_excel,
+    #"csv": pd.read_csv,
     # TODO: more filetype readers?
+    "xlsx": pl.read_excel,
+    "csv": pl.read_csv,
+}
+
+SCANNERS = {
+    "csv": pl.scan_csv,
 }
 
 
@@ -41,18 +48,20 @@ class Datasource[T](ABC):
 
     def __init__(self):
         self.logger = make_logger(self.name, config.log_dir)
+        self.lazy_load_raw = True
+
         self.metadata: Annotated[
             dict,  # TODO: dict template / typing?
             Doc("Data definition / metadata loaded from 'config.toml'"),
         ]
 
         self.raw: Annotated[
-            list[tuple[str, pd.DataFrame | gpd.GeoDataFrame]] | None,
+            list[tuple[str, pl.DataFrame | pd.DataFrame | gpd.GeoDataFrame]] | None,
             Doc("DataFrame of GeoDataFrame of raw data (created by `extract`)"),
         ] = None
 
         self.data: Annotated[
-            pd.DataFrame | gpd.GeoDataFrame | None,
+            pl.DataFrame | pd.DataFrame | gpd.GeoDataFrame | None,
             Doc(
                 "DataFrame or GeoDataFrame of processed data (created by `transform` or loaded from cache with `read_cache`)"
             ),
@@ -110,10 +119,19 @@ class Datasource[T](ABC):
             self.raw = gpd.read_file(self.source_files[0], layer=layer)
             self.logger.debug(f"Extracted raw data ({layer}; with geopandas)")
         else:
-            read_func = READERS[ext]
-            self.raw = [
-                (p, read_func(p, dtype_backend="pyarrow")) for p in self.source_files
-            ]
+            read_func = READERS.get(ext, None)
+            scan_func = SCANNERS.get(ext, None)
+            #self.raw = [
+            #    (p, read_func(p, dtype_backend="pyarrow")) for p in self.source_files
+            #]
+            if self.lazy_load_raw and scan_func:
+                self.raw = [
+                    (p, scan_func(p)) for p in self.source_files
+                ]
+            else:
+                self.raw = [
+                    (p, read_func(p)) for p in self.source_files
+                ]
             self.logger.debug("Extracted raw data")
         # TODO: self.logger.debug("Raw files loaded: 8/8")
         return
