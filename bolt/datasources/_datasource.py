@@ -159,7 +159,6 @@ class Datasource[T](ABC):
 
     def write_cache(self, *args, **kwargs) -> None:
         """How to cache processed data."""
-        #self.data.to_feather(self.cache_path, *args, **kwargs)
         self.data.write_ipc(self.cache_path)
         self.logger.info(f"Wrote cache file: {self.cache_path}")
         metadata = self.cache_metadata()
@@ -189,13 +188,13 @@ class Datasource[T](ABC):
         """Loads data attribute from cache file."""
         h = "HASH"  # TODO: file hash/metadata
         if self.metadata.get("load_with_geopandas", False):
-            self.data = gpd.read_feather(
+            self.data = gpd.read_feather(  # TODO: test this
                 self.cache_path, *args, **kwargs
-            )  # TODO: convert columns to pyarrow types?
+            )
             # self.logger.info(f"Cached file read (with geopandas): {self.version} {h}")
         else:
-            self.data = pd.read_feather(
-                self.cache_path, *args, **kwargs, dtype_backend="pyarrow"
+            self.data = pl.read_ipc(
+                self.cache_path, *args, **kwargs
             )
             # self.logger.info(f"Cached file read: {self.version} {h}")  # TODO: file hash
 
