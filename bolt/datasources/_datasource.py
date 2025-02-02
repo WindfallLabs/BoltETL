@@ -126,7 +126,7 @@ class Datasource[T](ABC):
             #]
             if self.lazy_load_raw and scan_func:
                 self.raw = [
-                    (p, scan_func(p)) for p in self.source_files
+                    (p, scan_func(p, ignore_errors=True)) for p in self.source_files
                 ]
             else:
                 self.raw = [
@@ -159,7 +159,8 @@ class Datasource[T](ABC):
 
     def write_cache(self, *args, **kwargs) -> None:
         """How to cache processed data."""
-        self.data.to_feather(self.cache_path, *args, **kwargs)
+        #self.data.to_feather(self.cache_path, *args, **kwargs)
+        self.data.write_ipc(self.cache_path)
         self.logger.info(f"Wrote cache file: {self.cache_path}")
         metadata = self.cache_metadata()
         # self.logger.info(f"Metadata (processed_by): {metadata.processed_by}")

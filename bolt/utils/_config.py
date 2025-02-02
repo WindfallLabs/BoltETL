@@ -18,6 +18,7 @@ class Config:
     def load_config(self):
         cfg = toml.load(CONFIG_PATH)
         self.metadata = cfg["metadata"]
+        self.holidays = cfg["holidays"]
 
         # Globals
         for k, v in cfg["global"].items():
