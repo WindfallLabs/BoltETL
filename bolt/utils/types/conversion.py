@@ -1,9 +1,7 @@
 """Type casting functions."""
 import geopandas as gpd
 import pandas as pd
-import pyarrow as pa
 
-from ._pyarrow_types import pyarrow_string
 
 def cast_many(
     df: pd.DataFrame | gpd.GeoDataFrame,

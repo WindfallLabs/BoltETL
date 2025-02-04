@@ -8,11 +8,9 @@ of any given year and month.
 import calendar
 import collections
 import datetime as dt
-import warnings
 from itertools import cycle
 
 import holidays
-import pandas as pd
 import polars as pl
 #from numpy import nan
 

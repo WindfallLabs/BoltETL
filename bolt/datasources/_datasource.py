@@ -2,11 +2,10 @@
 
 import datetime as dt
 from abc import ABC, abstractmethod
-from functools import wraps
 from getpass import getuser
 from pathlib import Path
 from platform import node
-from typing import Annotated, Callable
+from typing import Annotated
 
 import geopandas as gpd
 import pandas as pd
