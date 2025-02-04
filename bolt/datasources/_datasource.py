@@ -48,6 +48,7 @@ class Datasource[T](ABC):
     def __init__(self):
         self.logger = make_logger(self.name, config.log_dir)
         self.lazy_load_raw = True
+        self.schema_overrides: pl.Schema|None = None
 
         self.metadata: Annotated[
             dict,  # TODO: dict template / typing?
@@ -129,7 +130,7 @@ class Datasource[T](ABC):
                 ]
             else:
                 self.raw = [
-                    (p, read_func(p)) for p in self.source_files
+                    (p, read_func(p, schema_overrides=self.schema_overrides)) for p in self.source_files
                 ]
             self.logger.debug("Extracted raw data")
         # TODO: self.logger.debug("Raw files loaded: 8/8")
