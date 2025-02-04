@@ -16,7 +16,7 @@ import pandas as pd
 import polars as pl
 #from numpy import nan
 
-from bolt.utils import config
+from bolt.utils import config, YearMonth
 
 __changelog__ = """
 0.1.0 (2024-10):
@@ -94,7 +94,9 @@ def get_holiday_service(year: int, drop_observed=False) -> pl.DataFrame:
             .otherwise(pl.lit("Weekday"))
         )
         .otherwise(pl.col("Service"))
-        .alias("Service")
+        .alias("Service"),
+        # Set date to date (not datetime)
+        pl.col("Date").dt.date()
     )
 
     return holiday_df
@@ -113,6 +115,9 @@ def get_month_days(year: int, month: int) -> pl.DataFrame:
         schema=["Date", "DayName"],
         orient="row"
     )
+    df = df.with_columns(
+        pl.col("Date").dt.date()
+    )
     return df
 
 
@@ -129,21 +134,41 @@ def get_full_calendar(year: int, month: int, drop_observed=False) -> pl.DataFram
     """Returns a DataFrame of all dates in a month, the service type, and holiday names."""
     month_days: pl.DataFrame = get_month_days(year, month)
     holiday_df: pl.DataFrame = get_holiday_service(year, drop_observed=drop_observed)
-    full_cal_df: pl.DataFrame = month_days.join(
+    df: pl.DataFrame = month_days.join(
         holiday_df,
         on="Date",
         how="left"
     )
-    full_cal_df = full_cal_df.with_columns(
+    # Set normal Weekday service
+    df = df.with_columns(
         pl.when(
-            (pl.col("DayName").is_in(["Saturday", "Sunday"])) & 
-            (pl.col("Service").is_null())
+            pl.col("Service").is_null() & ~pl.col("DayName").is_in(["Saturday", "Sunday"])
+        )
+        .then(pl.lit("Weekday"))
+        .otherwise(pl.col("Service"))
+        .alias("Service")
+    )
+    # Get normal weekend service
+    df = df.with_columns(
+        pl.when(
+            pl.col("Service").is_null() & pl.col("DayName").is_in(["Saturday", "Sunday"])
         )
         .then(pl.col("DayName"))
-        .otherwise(pl.lit("Weekday"))
+        .otherwise(pl.col("Service"))
         .alias("Service")  # ServiceType
-    ).select("Date", "DayName", "Service", "Holiday")  # ServiceType
-    return full_cal_df
+    )
+    df = df.select("Date", "DayName", "Service", "Holiday").sort("Date")
+    return df
+
+
+def get_full_calendar_many(*yearmonths: int):
+    dfs = []
+    for ymth in set(yearmonths):
+        dfs.append(get_full_calendar(*YearMonth(ymth).to_year_and_month()))
+    df = pl.concat(dfs, how="vertical_relaxed").with_columns(
+        pl.col("Date").dt.date()
+    ).sort("Date")
+    return df
 
 
 def get_service_days(year: int, month: int) -> pl.DataFrame:
@@ -186,18 +211,25 @@ def get_service_days_many(*yearmonths: int) -> pl.DataFrame:
     for i in set(yearmonths):
         year = int(str(i)[:4])
         month = int(str(i)[4:])
-        df = get_service_days(year, month)
-        dfs.append(df)
-    x = pl.concat(dfs, how="vertical").sort("YMTH")
-    return x
+        dfs.append(get_service_days(year, month))
+    df = pl.concat(dfs, how="vertical_relaxed").sort("YMTH")
+    return df
+
+
+def add_service(df: pl.DataFrame, ymth_col: str = "YMTH"):
+    """Adds a 'Service' column to a dataframe using a date column."""
+    cal_df: pl.DataFrame = (
+        get_full_calendar_many(*set(df[ymth_col]))
+        .select("Date", "Service")
+    )
+    return df.join(cal_df, on=["Date"])
 
 
 def add_service_days(df: pl.DataFrame, ymth_col: str = "YMTH", service_col: str = "Service"):
     """Adds a new 'Service Days' column to a DataFrame given a Year-Month
     column and 'Service' column."""
-    #df = df.copy()
     service_df: pl.DataFrame = (
         get_service_days_many(*set(df[ymth_col]))
         .select("YMTH", "Service", "DayCount")
     )
-    return df.join(service_df, on=["YMTH", "Service"])
+    return df.join(service_df, on=[ymth_col, service_col])

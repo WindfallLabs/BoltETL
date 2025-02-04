@@ -143,15 +143,6 @@ class Datasource[T](ABC):
         # self.data = df
         pass
 
-    def enrich(self) -> None:  # optional abstract method
-        """Define how the transformed data is enriched."""
-        pass
-
-    def _enrich(self) -> None:  # TODO: replace this with a metadata flag
-        result = self.enrich()
-        self.is_enriched = True
-        return result  # probably None
-
     def load(self, dst: Engine, *args, **kwargs):  # TODO: what is this good for?
         """Defines how the the processed data is loaded into a target database."""
         self.data.to_sql(self.name, dst, *args, **kwargs)
@@ -206,7 +197,7 @@ class Datasource[T](ABC):
         """Describe the rules that the data must adhere to before exported via `load`."""
         pass
 
-    def update(self, enrich=True):
+    def update(self):
         """Convenience method to combine Extract, Transform, Enrich, and Cache methods."""
         self.logger.info("Beginning full update process")
         if hasattr(self, "download"):
@@ -214,8 +205,6 @@ class Datasource[T](ABC):
             self.download()
         self.extract()
         self.transform()
-        if enrich:
-            self._enrich()
         self.write_cache()
         self.logger.info("Update complete")
         return

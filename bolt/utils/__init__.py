@@ -1,4 +1,5 @@
-from . import funcs, types, version
+from . import funcs, schema, version
+from . import types  # TODO: deprecate
 from ._config import CONFIG_PATH, Config
 from ._download import download
 from ._logger import make_logger
@@ -14,7 +15,7 @@ __all__ = [
     "download",
     "funcs",
     "make_logger",
-    "types",
+    "schema",
     # ...
     "version",
     "YearMonth",

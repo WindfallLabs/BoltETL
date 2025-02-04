@@ -1,6 +1,5 @@
 from . import conversion
 from ._pyarrow_types import *
-from .misc import schematize
 
 __all__ = [
     "conversion",
@@ -11,6 +10,5 @@ __all__ = [
     "pyarrow_time",
     "pyarrow_uint16",
     "pyarrow_uint32",
-    "pyarrow_float32",
-    "schematize"
+    "pyarrow_float32"
 ]

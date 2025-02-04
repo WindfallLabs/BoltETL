@@ -10,6 +10,12 @@ class YearMonth[T]:
         self.month = int(str(yearmonth)[4:])
 
     @classmethod
+    def from_date(cls, date: dt.date) -> T:
+        """Converts a date (string) to a Year-Month."""
+        ymth = int(date.strftime("%Y%m"))
+        return YearMonth(ymth)
+
+    @classmethod
     def from_date_string(cls, date_str: str, format: str) -> T:
         """Converts a date (string) to a Year-Month."""
         ymth = int(dt.datetime.strptime(date_str, format).strftime("%Y%m"))
@@ -24,6 +30,10 @@ class YearMonth[T]:
     @classmethod
     def from_ints(cls, year: int, month: int):
         return f"{year}{str(month).zfill(2)}"
+
+    def to_year_and_month(self) -> tuple[int, int]:
+        """Returns a tuple of year and month."""
+        return (self.year, self.month)
 
     def __repr__(self):
         return f"<YearMonth: {self.yearmonth}>"
