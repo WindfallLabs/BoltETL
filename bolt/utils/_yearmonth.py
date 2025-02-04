@@ -2,10 +2,12 @@ import re
 import datetime as dt
 from pathlib import Path
 
+import polars as pl
+
 
 class YearMonth[T]:
     def __init__(self, yearmonth: str | int):
-        self.yearmonth = int(yearmonth)
+        self.yearmonth = int(yearmonth)  # Remove?
         self.year = int(str(yearmonth)[:4])
         self.month = int(str(yearmonth)[4:])
 
@@ -14,6 +16,13 @@ class YearMonth[T]:
         """Converts a date (string) to a Year-Month."""
         ymth = int(date.strftime("%Y%m"))
         return YearMonth(ymth)
+
+    @classmethod
+    def from_date_series(cls, date_col: pl.Expr) -> pl.Expr:
+        return date_col.map_elements(
+            lambda x: int(cls.from_date(x)),
+            return_dtype=pl.Int64
+        ).alias("YMTH")
 
     @classmethod
     def from_date_string(cls, date_str: str, format: str) -> T:
@@ -34,6 +43,10 @@ class YearMonth[T]:
     def to_year_and_month(self) -> tuple[int, int]:
         """Returns a tuple of year and month."""
         return (self.year, self.month)
+
+    def as_series(self, col_name: str = "YMTH") -> pl.Series:
+        """Return an expression defining a YMTH column literal."""
+        return pl.lit(self.yearmonth, dtype=pl.Int64).alias(col_name)
 
     def __repr__(self):
         return f"<YearMonth: {self.yearmonth}>"
