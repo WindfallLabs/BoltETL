@@ -7,5 +7,5 @@ Added:
 
 Changed:
 - Now primarily leverages `polars` rather than `pandas`
-- The `extract` method uses polar's lazy mode (by default) to load raw data
-- Cached data uses the ".arrow" extension
+- The `extract` method uses polar's lazy mode (by default) to load raw data (but not for xlsx)
+- Cached data uses the `write_icp` and ".arrow" extension

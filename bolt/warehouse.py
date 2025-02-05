@@ -13,7 +13,7 @@ SQL_FUNCS = [
     funcs.fiscal_year,
 ]
 
-SQL_FILES: list[Path] = list(Path(__file__).parent.joinpath("sql").glob("*.sql"))
+SQL_FILES: list[Path] = config.sql_dir.rglob("*.sql")
 
 
 def load_funcs(con: duckdb.DuckDBPyConnection) -> None:

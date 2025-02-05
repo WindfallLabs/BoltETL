@@ -196,7 +196,7 @@ def get_service_days(year: int, month: int) -> pl.DataFrame:
     df = pl.concat([df, df.sum().fill_null("Total")])
     # Display the target time period (yearmonth)
     df = df.with_columns(
-        pl.lit(int(str(year) + str(month).zfill(2))).alias("YMTH"),
+        pl.lit(str(year) + str(month).zfill(2), dtype=pl.String).alias("YMTH"),
         pl.col("DayName").alias("DayCount"),
         pl.col("Holiday").alias("HolidayCount")
     ).select("YMTH", "Service", "DayCount", "HolidayCount")  # ServiceType
