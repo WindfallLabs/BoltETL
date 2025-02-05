@@ -1,5 +1,5 @@
-import time
 import datetime as dt
+import time
 from fnmatch import fnmatch
 from pathlib import Path
 from typing import Literal
@@ -188,8 +188,8 @@ def update(datasource_name: str, force: bool = False, skip_db: bool = False):
     else:
         with console.status("Updating database:"):
             try:
-                tables_loaded, sql_file_count, compact_msg = (
-                    bolt.warehouse.update_db(compact_db=True)
+                tables_loaded, sql_file_count, compact_msg = bolt.warehouse.update_db(
+                    compact_db=True
                 )
                 db_msg = (
                     f"        [green]Updated: {WAREHOUSE}[/]\n"
@@ -217,9 +217,9 @@ if __name__ == "__main__":
         console.print_exception()
     finally:
         t_end = time.time()
-        t = dt.timedelta(seconds=t_end-t_start)
+        t = dt.timedelta(seconds=t_end - t_start)
         min = int(t.total_seconds() // 60)
         sec = t.total_seconds() % 60
         t_msg = f"{min}:{sec:.2f}"
-        #t_msg = f"{tot_seconds/60:.2f} minutes" if tot_seconds > 100 else f"{tot_seconds:.2f} seconds"
+        # t_msg = f"{tot_seconds/60:.2f} minutes" if tot_seconds > 100 else f"{tot_seconds:.2f} seconds"
         console.print(f"[white](Time: {t_msg})[/]")

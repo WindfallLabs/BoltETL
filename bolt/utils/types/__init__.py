@@ -10,5 +10,5 @@ __all__ = [
     "pyarrow_time",
     "pyarrow_uint16",
     "pyarrow_uint32",
-    "pyarrow_float32"
+    "pyarrow_float32",
 ]

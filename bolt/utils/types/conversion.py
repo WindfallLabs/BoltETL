@@ -1,12 +1,11 @@
 """Type casting functions."""
+
 import geopandas as gpd
 import pandas as pd
 
 
 def cast_many(
-    df: pd.DataFrame | gpd.GeoDataFrame,
-    columns: list[str],
-    dtype: type | pd.ArrowDtype
+    df: pd.DataFrame | gpd.GeoDataFrame, columns: list[str], dtype: type | pd.ArrowDtype
 ) -> pd.DataFrame | gpd.GeoDataFrame:
     """Cast many columns to a specified PyArrow DType."""
     df = df.copy()
@@ -27,14 +26,14 @@ def clean_strings(s: pd.Series, remove_decimals=True) -> pd.Series:
     return col
 
 
-def cast_df_to_pyarrow(df, schema: dict[pd.ArrowDtype, list[str]], create_missing=False):
+def cast_df_to_pyarrow(
+    df, schema: dict[pd.ArrowDtype, list[str]], create_missing=False
+):
     """Casts columns of a Dataframe to PyArrow types given a schema."""
     df = df.copy()
     ext = tuple(
-        {
-            value: key for key, values in schema.items()
-            for value in values
-        }.items())
+        {value: key for key, values in schema.items() for value in values}.items()
+    )
 
     for col_name, arrow_type in ext:
         if col_name not in df.columns and create_missing:

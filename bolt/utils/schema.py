@@ -1,15 +1,16 @@
 """Functions related to dataframe schemas."""
-import polars as pl
+
 import pandas as pd
+import polars as pl
 
 
 def apply_dtypes(
-        df: pl.DataFrame,
-        schema: tuple[tuple[str, pl.DataType]],
-        sort = True,
-        ignore_missing = True,
-        date_format: str = "%m/%d/%Y"
-    ) -> pl.DataFrame:
+    df: pl.DataFrame,
+    schema: tuple[tuple[str, pl.DataType]],
+    sort=True,
+    ignore_missing=True,
+    date_format: str = "%m/%d/%Y",
+) -> pl.DataFrame:
     """Casts existing columns of a DataFrame to the specified dtypes in a given schema.
     Ignores columns in the schema that don't exist.
 
@@ -80,21 +81,17 @@ def apply_dtypes(
             expressions.append(pl.col(col).cast(dtype))
 
     # Create returned dataframe
-    df = df.with_columns(
-            *expressions
-    )
+    df = df.with_columns(*expressions)
     if sort:
         df = df.select(select_columns)
     return df
 
 
 def apply_sorting(
-        df: pl.DataFrame,
-        schema: tuple[tuple[str, pl.DataType]],
-        drop_nonetypes = True
+    df: pl.DataFrame, schema: tuple[tuple[str, pl.DataType]], drop_nonetypes=True
 ) -> pl.DataFrame:
     """Sorts a dataframe using the provided schema.
-    
+
     Parameters
     ----------
     df : pl.DataFrame
@@ -122,10 +119,10 @@ def apply_sorting(
 
 
 def validate(
-        df: pl.DataFrame,
-        schema: tuple[tuple[str, pl.DataType]],
-        sort = True,
-        drop_nonetypes = True
+    df: pl.DataFrame,
+    schema: tuple[tuple[str, pl.DataType]],
+    sort=True,
+    drop_nonetypes=True,
 ) -> None:
     """Asserts that dataframe schema and expected schema are equal."""
     expected = set(schema)
@@ -143,13 +140,13 @@ def validate(
 
 
 def check_names(
-        df: pl.DataFrame,
-        schema: tuple[tuple[str, pl.DataType]],
-        ignore_missing: list[str] | None = None
-    ) -> None:
+    df: pl.DataFrame,
+    schema: tuple[tuple[str, pl.DataType]],
+    ignore_missing: list[str] | None = None,
+) -> None:
     """Compares actual column names in dataframe to column names provided
     in schema.
-    
+
     Parameters
     ----------
     df : pl.DataFrame
@@ -192,7 +189,11 @@ def check_names(
 
     # Raise errors
     if missing:
-        raise pl.exceptions.ColumnNotFoundError(f"`check_names` found columns missing from dataframe: {missing}")
+        raise pl.exceptions.ColumnNotFoundError(
+            f"`check_names` found columns missing from dataframe: {missing}"
+        )
     if not_expected:
-        raise pl.exceptions.SchemaError(f"`check_names` found columns not expected by schema: {not_expected}")
+        raise pl.exceptions.SchemaError(
+            f"`check_names` found columns not expected by schema: {not_expected}"
+        )
     return

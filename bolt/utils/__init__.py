@@ -1,5 +1,9 @@
-from . import funcs, schema, version
-from . import types  # TODO: deprecate
+from . import (
+    funcs,
+    schema,
+    types,  # TODO: deprecate
+    version,
+)
 from ._config import CONFIG_PATH, Config
 from ._download import download
 from ._logger import make_logger

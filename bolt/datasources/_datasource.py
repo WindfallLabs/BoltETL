@@ -19,8 +19,8 @@ from bolt.utils import config, make_logger, version
 SUPPORTED_CACHE_TYPES = ("DISABLE", "feather")
 
 READERS = {
-    #"xlsx": pd.read_excel,
-    #"csv": pd.read_csv,
+    # "xlsx": pd.read_excel,
+    # "csv": pd.read_csv,
     # TODO: more filetype readers?
     "xlsx": pl.read_excel,
     "csv": pl.read_csv,
@@ -48,7 +48,7 @@ class Datasource[T](ABC):
     def __init__(self):
         self.logger = make_logger(self.name, config.log_dir)
         self.lazy_load_raw = True
-        self.schema_overrides: pl.Schema|None = None
+        self.schema_overrides: pl.Schema | None = None
 
         self.metadata: Annotated[
             dict,  # TODO: dict template / typing?
@@ -101,7 +101,8 @@ class Datasource[T](ABC):
     def cache_path(self) -> Path:
         """Return the path (string) to cached data file."""
         cache_filetype = self.metadata.get(
-            "cache_filetype", "feather"  # TODO: arrow
+            "cache_filetype",
+            "feather",  # TODO: arrow
         )  # TODO: DOCUMENT that caching to .arrow is default
         if cache_filetype not in SUPPORTED_CACHE_TYPES:
             raise TypeError(f"'{cache_filetype}' file type not (yet) supported")
@@ -127,7 +128,8 @@ class Datasource[T](ABC):
                 ]
             else:
                 self.raw = [
-                    (p, read_func(p, schema_overrides=self.schema_overrides)) for p in self.source_files
+                    (p, read_func(p, schema_overrides=self.schema_overrides))
+                    for p in self.source_files
                 ]
             self.logger.debug("Extracted raw data")
         # TODO: self.logger.debug("Raw files loaded: 8/8")
@@ -136,12 +138,12 @@ class Datasource[T](ABC):
     @abstractmethod
     def transform(self) -> None:
         """Defines how raw data is transformed (processed/cleaned).
-        
-            Example
-            -------
-            >>> df = pl.concat([i[1] for i in self.raw], how="vertical_relaxed")  # doctest: +SKIP
-            >>> ...
-            >>> self.data = df
+
+        Example
+        -------
+        >>> df = pl.concat([i[1] for i in self.raw], how="vertical_relaxed")  # doctest: +SKIP
+        >>> ...
+        >>> self.data = df
         """
         pass
 
@@ -186,9 +188,7 @@ class Datasource[T](ABC):
             )
             # self.logger.info(f"Cached file read (with geopandas): {self.version} {h}")
         else:
-            self.data = pl.read_ipc(
-                self.cache_path, *args, **kwargs
-            )
+            self.data = pl.read_ipc(self.cache_path, *args, **kwargs)
             # self.logger.info(f"Cached file read: {self.version} {h}")  # TODO: file hash
 
         # Load cache metadata

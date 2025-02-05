@@ -1,5 +1,5 @@
-import re
 import datetime as dt
+import re
 from pathlib import Path
 
 import polars as pl
@@ -22,8 +22,7 @@ class YearMonth[T]:
     @classmethod
     def from_date_series(cls, date_col: pl.Expr) -> pl.Expr:
         return date_col.map_elements(
-            lambda x: str(cls.from_date(x)),
-            return_dtype=cls.dtype
+            lambda x: str(cls.from_date(x)), return_dtype=cls.dtype
         ).alias("YMTH")
 
     @classmethod
