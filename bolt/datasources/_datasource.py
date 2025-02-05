@@ -101,8 +101,8 @@ class Datasource[T](ABC):
     def cache_path(self) -> Path:
         """Return the path (string) to cached data file."""
         cache_filetype = self.metadata.get(
-            "cache_filetype", "feather"
-        )  # TODO: DOCUMENT that caching to .feather is default
+            "cache_filetype", "feather"  # TODO: arrow
+        )  # TODO: DOCUMENT that caching to .arrow is default
         if cache_filetype not in SUPPORTED_CACHE_TYPES:
             raise TypeError(f"'{cache_filetype}' file type not (yet) supported")
         if cache_filetype == "DISABLE":
@@ -121,9 +121,6 @@ class Datasource[T](ABC):
         else:
             read_func = READERS.get(ext, None)
             scan_func = SCANNERS.get(ext, None)
-            #self.raw = [
-            #    (p, read_func(p, dtype_backend="pyarrow")) for p in self.source_files
-            #]
             if self.lazy_load_raw and scan_func:
                 self.raw = [
                     (p, scan_func(p, ignore_errors=True)) for p in self.source_files
@@ -138,9 +135,14 @@ class Datasource[T](ABC):
 
     @abstractmethod
     def transform(self) -> None:
-        """Defines how raw data is transformed (processed/cleaned)."""
-        # df = ...
-        # self.data = df
+        """Defines how raw data is transformed (processed/cleaned).
+        
+            Example
+            -------
+            >>> df = pl.concat([i[1] for i in self.raw], how="vertical_relaxed")  # doctest: +SKIP
+            >>> ...
+            >>> self.data = df
+        """
         pass
 
     def load(self, dst: Engine, *args, **kwargs):  # TODO: what is this good for?
