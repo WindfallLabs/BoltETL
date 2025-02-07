@@ -1,6 +1,7 @@
 import datetime as dt
 import time
 from fnmatch import fnmatch
+from hashlib import sha256
 from pathlib import Path
 from typing import Literal
 
@@ -18,6 +19,12 @@ app = cyclopts.App()
 
 tracker = FileTracker()
 
+logo = """┏━━┓━━━━━┏┓━━┏┓━┏━━━┓┏━━━━┓┏┓━━━
+┃┏┓┃━━━━━┃┃━┏┛┗┓┃┏━━┛┃┏┓┏┓┃┃┃━━━
+┃┗┛┗┓┏━━┓┃┃━┗┓┏┛┃┗━━┓┗┛┃┃┗┛┃┃━━━
+┃┏━┓┃┃┏┓┃┃┃━━┃┃━┃┏━━┛━━┃┃━━┃┃━┏┓
+┃┗━┛┃┃┗┛┃┃┗┓━┃┗┓┃┗━━┓━┏┛┗┓━┃┗━┛┃
+┗━━━┛┗━━┛┗━┛━┗━┛┗━━━┛━┗━━┛━┗━━━┛"""
 
 SCRIPT = Path(__file__).name
 WAREHOUSE = "data_warehouse.duckdb"
@@ -29,6 +36,22 @@ for ds in bolt.config.metadata.keys():
         DATASOURCES.append(DS)
 
 REPORTS: list = []
+
+
+def hash_sources(ds: bolt.datasources.Datasource):
+    hashes = []
+    try:
+        for p in ds.source_files:
+            p: Path = Path(p)
+            if p.is_dir():
+                raise AttributeError("TODO: Hash cannot be performed on folder")
+            with p.open("rb") as f:
+                hashes.append(sha256(f.read()).hexdigest())
+    except:
+        # return sha256(dt.date.today())[:7]
+        raise AttributeError(f"TODO: Hash cannot be performed on {ds.name}")
+    current_hash = sha256("".join(hashes).encode("UTF8")).hexdigest()[:7]
+    return current_hash
 
 
 @app.command
@@ -126,6 +149,7 @@ def report(option: Literal["list", "info", "run"], rpt_name: str = "", *args, **
     return
 
 
+'''
 @app.command
 def task(
     option: Literal["list", "add", "remove"], name: str = "", when: str = ""
@@ -141,10 +165,17 @@ def task(
     elif option == "remove":
         console.print(f"Removed: {name}")  # TODO: dev
     return
+'''
 
 
 @app.command
-def update(datasource_name: str, force: bool = False, skip_db: bool = False):
+def update(
+    datasource_name: str,
+    ignore: list[str] | None = None,
+    force=False,
+    skip_db=False,
+    ignore_errors=False,
+):
     """Updates datasource by name, or all configured datasources ('.').
     Alternatively, update only the data warehouse using 'db'.
     Examples:
@@ -152,34 +183,83 @@ def update(datasource_name: str, force: bool = False, skip_db: bool = False):
         `python bolt-cmd.py update db`  # updates only the database
         `python bolt-cmd.py update <datasource>`  # updates <datasource>
     """
+    if not ignore:
+        ignore = []
+    # Determine datasources to process
     datasources: list[bolt.datasources.Datasource] | None = None
+    ## All
     if datasource_name == ".":
         datasources = DATASOURCES
+    ## Just the DB
     elif datasource_name.lower() == "db":
         datasources = []
+    ## Just the specified one
     else:
         datasources = [getattr(bolt.datasources, datasource_name)]
 
+    # Database
+    db = bolt.warehouse.connect()
+    db.sql(
+        "CREATE TABLE IF NOT EXISTS data_updates (datasource VARCHAR PRIMARY KEY, last_updated DATE, hash VARCHAR(7));"
+    )
+    # db.sql("CREATE TABLE IF NOT EXISTS source_files (datasource VARCHAR PRIMARY KEY, source_file VARCHAR PRIMARY KEY, hash VARCHAR, mod_date DATE);")
+    db.close()
+
+    # A list of errors to print
     errors: list[tuple[str, Exception]] = []
+    # Process datasources
     if datasources:
+        tables_loaded = 0
         update_msg = "Updating datasources:"
         if force:
             update_msg = "Updating datasources (force=True):"
         console.print(update_msg)
 
         for D in datasources:
-            d = D()
-            with console.status(f"      Updating {d.name}..."):
-                try:
-                    d.update()
-                    msg = f"        [green]Updated: {d.name}[/]"
-                except Exception as e:
-                    errors.append((d.name, e))
-                    msg = f"        [green]Updated: {d.name}[/]"
-            console.print(msg)
+            try:
+                d = D()
+                if d.name in ignore:
+                    console.print(f"        [yellow]Skipped: {d.name} (ignored)[/]")
+                    continue
+                db = bolt.warehouse.connect()
+
+                ## Hash (sha256) the source files
+                current_hash = hash_sources(d)
+                if not force:
+                    # Ignore update for datasources with no changes to the source files
+                    ## Get the last hash (sha256) of the source files
+                    update_hash = db.sql(
+                        f"SELECT hash FROM data_updates WHERE datasource = '{d.name}'"
+                    ).pl()["hash"]
+                    ## Compare hashes and skip if they are the same
+                    if not update_hash.is_empty() and current_hash == update_hash.item():
+                        console.print(f"        [yellow]Skipped: {d.name} (unchanged)[/]")
+                        continue
+                with console.status(f"      Updating {d.name}..."):
+                    df = d.update()
+                    schema = d.output_schema()
+                    # Write to database
+                    db.sql(f"CREATE OR REPLACE TABLE {d.name} AS SELECT * FROM df")
+                    db.sql(
+                        f"CREATE OR REPLACE TABLE {d.name}_schema AS SELECT * FROM schema"
+                    )
+
+                    db.sql(
+                        f"INSERT OR REPLACE INTO data_updates VALUES ('{d.name}', '{dt.date.today()}', '{current_hash}')"
+                    )
+                    console.print(f"        [green]Updated: {d.name}[/]")
+                    tables_loaded += 1
+            except Exception as e:
+                errors.append((d.name, e))
+                console.print(f"        [red]Failed: {d.name}[/]")
+                if not ignore_errors:
+                    raise e
+            finally:
+                db.close()
+        console.print(f"    Tables Loaded: {tables_loaded}")
 
     # Update database
-    console.print("Updating database:")
+    console.print("\nUpdating database:")
     if len(errors) > 0:
         skip_db = True  # Override the skip_db flag
 
@@ -188,12 +268,9 @@ def update(datasource_name: str, force: bool = False, skip_db: bool = False):
     else:
         with console.status("Updating database:"):
             try:
-                tables_loaded, sql_file_count, compact_msg = bolt.warehouse.update_db(
-                    compact_db=True
-                )
+                sql_file_count, compact_msg = bolt.warehouse.update_sql(compact_db=True)
                 db_msg = (
                     f"        [green]Updated: {WAREHOUSE}[/]\n"
-                    f"            Tables Loaded: {tables_loaded}\n"
                     f"            SQL Files Executed: {sql_file_count}\n"
                     f"            {compact_msg}"
                 )
@@ -221,5 +298,4 @@ if __name__ == "__main__":
         min = int(t.total_seconds() // 60)
         sec = t.total_seconds() % 60
         t_msg = f"{min}:{sec:.2f}"
-        # t_msg = f"{tot_seconds/60:.2f} minutes" if tot_seconds > 100 else f"{tot_seconds:.2f} seconds"
-        console.print(f"[white](Time: {t_msg})[/]")
+        console.print(f"[white](Time: {t_msg})[/]\n")

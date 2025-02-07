@@ -50,10 +50,22 @@ class Datasource[T](ABC):
         self.lazy_load_raw = True
         self.schema_overrides: pl.Schema | None = None
 
+        # Metadata
         self.metadata: Annotated[
             dict,  # TODO: dict template / typing?
             Doc("Data definition / metadata loaded from 'config.toml'"),
         ]
+        try:
+            # TODO: consider pydantic for validation and type casting
+            self.metadata = {
+                k: Path(v) if "_dir" in k or "_path" in k else v
+                for k, v in config.metadata[self.name].items()
+            }
+        except KeyError:
+            raise KeyError(f"Name mismatch: '{self.name}' not in config.toml")
+
+        # Cache path
+        self.cache_path = config.cache_dir.joinpath(f'{self.metadata["name"]}.arrow')
 
         self.raw: Annotated[
             list[tuple[str, pl.DataFrame | pd.DataFrame | gpd.GeoDataFrame]] | None,
@@ -69,14 +81,6 @@ class Datasource[T](ABC):
 
         self.is_enriched: bool = False
 
-        try:
-            # TODO: consider pydantic for validation and type casting
-            self.metadata = {
-                k: Path(v) if "_dir" in k or "_path" in k else v
-                for k, v in config.metadata[self.name].items()
-            }
-        except KeyError:
-            raise KeyError(f"Name mismatch: '{self.name}' not in config.toml")
         # self.logger.debug(f"Initialized {self.name}")
 
     @property
@@ -96,20 +100,6 @@ class Datasource[T](ABC):
             # Ignore source / raw files that start with "_"
             if not p.name.startswith("_") and not p.name.startswith("~")
         ]
-
-    @property
-    def cache_path(self) -> Path:
-        """Return the path (string) to cached data file."""
-        cache_filetype = self.metadata.get(
-            "cache_filetype",
-            "feather",  # TODO: arrow
-        )  # TODO: DOCUMENT that caching to .arrow is default
-        if cache_filetype not in SUPPORTED_CACHE_TYPES:
-            raise TypeError(f"'{cache_filetype}' file type not (yet) supported")
-        if cache_filetype == "DISABLE":
-            raise IOError(f"Caching is disabled for '{self.name}'")
-        # Default
-        return config.cache_dir.joinpath(f'{self.metadata["name"]}.{cache_filetype}')
 
     def extract(self):
         """Open the raw data source file(s). Can be over-written to customize."""
@@ -199,8 +189,21 @@ class Datasource[T](ABC):
         """Describe the rules that the data must adhere to before exported via `load`."""
         pass
 
+    def output_schema(self):
+        """Outputs the schema of the datasource."""
+        if self.data is None:
+            self.read_cache()
+        schema = (
+            pl.DataFrame(
+                dict(zip(self.data.columns, [str(i) for i in self.data.dtypes]))
+            )
+            .transpose(include_header=True)
+            .rename({"column_0": "dtype"})
+        )
+        return schema
+
     def update(self):
-        """Convenience method to combine Extract, Transform, Enrich, and Cache methods."""
+        """Convenience method to combine Extract, Transform, and Cache methods."""
         self.logger.info("Beginning full update process")
         if hasattr(self, "download"):
             self.logger.info("'download' method found and running")
@@ -209,4 +212,4 @@ class Datasource[T](ABC):
         self.transform()
         self.write_cache()
         self.logger.info("Update complete")
-        return
+        return self.data

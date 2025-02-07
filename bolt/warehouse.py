@@ -3,7 +3,6 @@
 from pathlib import Path
 
 import duckdb
-import pandas as pd
 
 from bolt.utils import config, funcs
 
@@ -51,49 +50,21 @@ def compact() -> tuple[str]:
     DB_PATH.unlink()
     new_db.rename(new_db.parent.joinpath(name))
     new_size = DB_PATH.stat().st_size / 1024
-    # print(f"  Compacted ({old_size:,.0f} KB to {new_size:,.0f} KB)")
-    return f"Compacted ({old_size:,.0f} KB to {new_size:,.0f} KB)"
+    return f"[white]Compacted ({old_size:,.0f} KB to {new_size:,.0f} KB[/])"
 
 
-def load_cache_files(compact_db=False) -> None:
-    """Loads feather files into the DuckDB Data Warehouse."""
-    with duckdb.connect(DB_PATH) as con:
-        tables_loaded = 0
-        for i in config.cache_dir.rglob("*.feather"):
-            tbl_name = Path(i).name.split(".")[0]
-            # Load the feather file as a dataframe
-            df = pd.read_feather(i, dtype_backend="pyarrow")  # noqa: F841
-            # Load the dataframe into DuckDB
-            con.sql(
-                f"CREATE OR REPLACE TABLE {tbl_name} AS SELECT * FROM df"
-            )  # reads from Python variables I guess?
-            tables_loaded += 1
-
-    # print(f"  Loaded tables: {tables_loaded}")
-    return tables_loaded
-
-
-def execute_sql():
+def update_sql(compact_db=False) -> tuple[int, str]:
+    """Update the DuckDB data warehouse."""
+    # Execute SQL from files
     sql_file_count = 0
     for sql_file in SQL_FILES:
-        # print(sql_file)  # DEBUG
         with sql_file.open() as f:
             sql = f.read()
             with duckdb.connect(DB_PATH) as con:
                 con.sql(sql)
         sql_file_count += 1
-    return sql_file_count
-
-
-def update_db(compact_db=False) -> tuple[int, str]:
-    """Update the DuckDB data warehouse."""
-    # Load data from cached files
-    tables_loaded = load_cache_files()
-    # Load misc dataframes
-    # misc_loaded = load_misc_dataframes()  # TODO: implement
-    # Execute SQL from files
-    sql_file_count = execute_sql()
+    # Compact DB
     compact_msg = ""
     if compact_db:
         compact_msg = compact()
-    return (tables_loaded, sql_file_count, compact_msg)
+    return (sql_file_count, compact_msg)
