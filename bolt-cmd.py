@@ -1,21 +1,15 @@
 import datetime as dt
 import time
 
-# from fnmatch import fnmatch
-# from hashlib import sha256
 from pathlib import Path
 from typing import Literal
 
 import cyclopts
 
-# import polars as pl
-# import xlsxwriter
 from rich.console import Console
 
 import bolt
 import bolt.warehouse
-
-# from bolt.utils.file_tracker import FileTracker
 
 __version__ = "0.2.0-dev"
 t_start = time.time()  # Start process timer
@@ -35,13 +29,25 @@ logo = """┏━━┓━━━━━┏┓━━┏┓━┏━━━┓┏━�
 SCRIPT = Path(__file__).name
 WAREHOUSE = "data_warehouse.duckdb"
 
+# Populate a list of custom Datasource objects
 DATASOURCES: list[bolt.datasources.Datasource] = []
 for ds in bolt.config.metadata.keys():
     DS = getattr(bolt.datasources, ds, None)
     if DS and issubclass(DS, bolt.datasources.Datasource):
         DATASOURCES.append(DS)
 
-REPORTS: list = []
+# Populate a list of custom Report objects
+REPORTS: list[bolt.reports.BaseReport] = []
+for _obj_name in bolt.reports.__dir__():
+    RPT = getattr(bolt.reports, _obj_name, None)
+    if type(RPT).__name__ in ("str", "module"):
+        continue
+    if not hasattr(RPT, "__name__") or not hasattr(RPT, "__class__"):
+        continue
+    if RPT.__name__ == "BaseReport":
+        continue
+    if issubclass(RPT, bolt.reports.BaseReport):
+        REPORTS.append(RPT)
 
 # TODO: fix and re-implement
 '''
@@ -115,9 +121,11 @@ def report(option: Literal["list", "info", "run"], rpt_name: str = "", *args, **
     """
     # NOTE: list option does not require 'rpt_name'
     if option == "list":
-        console.print("Reports available (in 'bolt.reports.__all__'):")
-        for rpt_name in bolt.reports.__all__:
-            console.print(f"        [blue]{rpt_name}[/]")
+        console.print("Available Reports:")
+        for rpt in REPORTS:
+            console.print(f"        [green]{rpt.__name__}[/]")
+        console.print("For more info, use: ")
+        console.print("[b blue]`python bolt-cmd.py report info <report name>`[/]")
         return
 
     # TODO: consider an '--update' flag to update report dependencies
