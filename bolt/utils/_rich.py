@@ -4,9 +4,9 @@ from rich.table import Table
 
 def df_to_table(
     pandas_dataframe: pd.DataFrame,
-    rich_table: Table|None = None,
+    rich_table: Table | None = None,
     show_index: bool = True,
-    index_name: str|None = None,
+    index_name: str | None = None,
 ) -> Table:
     """Convert a pandas.DataFrame obj into a rich.Table obj.
     Args:

@@ -1,7 +1,6 @@
 from . import (
     funcs,
     schema,
-    types,  # TODO: deprecate
     version,
 )
 from ._config import CONFIG_PATH, Config
@@ -17,6 +16,7 @@ __all__ = [
     "CRS",
     "config",
     "CONFIG_PATH",
+    "df_to_table",
     "download",
     "funcs",
     "make_logger",

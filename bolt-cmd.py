@@ -1,11 +1,9 @@
 import datetime as dt
 import time
-
 from pathlib import Path
 from typing import Literal
 
 import cyclopts
-
 from rich.console import Console
 
 import bolt
@@ -111,7 +109,9 @@ def status():
 
 
 @app.command
-def report(option: Literal["list", "info", "run"], rpt_name: str = "", *args, **kwargs):  # TODO: write: bool = True?
+def report(
+    option: Literal["list", "info", "run"], rpt_name: str = "", *args, **kwargs
+):  # TODO: write: bool = True?
     """Execute a report by report class name with kwargs.
     Use `report-info <report name>` for details about a report.
 
@@ -145,7 +145,7 @@ def report(option: Literal["list", "info", "run"], rpt_name: str = "", *args, **
         console.print(f"Running report: {rpt_name}...")
         console.print(f"        (args={args})")
         console.print(f"        (kwargs={kwargs})")
-        #console.print("        ...", end="\r")
+        # console.print("        ...", end="\r")
         try:
             rpt.run(*args, **kwargs)
             if rpt._exported:
@@ -247,7 +247,7 @@ def update(
                         )
                         continue
                 with console.status(f"[cyan]      Updating {d.name}...[/]"):
-                    df = d.update()
+                    df = d.update()  # noqa: F841
                     # schema = d.output_schema()
                     # Write to database
                     db.sql(f"CREATE OR REPLACE TABLE {d.name} AS SELECT * FROM df")

@@ -17,7 +17,8 @@ SQL_FUNCS = [
 ]
 
 SQL_FILES: list[Path] = [
-    config.definitions_dir.joinpath("sql").joinpath(sql_file) for sql_file in config.dependencies["sql"]
+    config.definitions_dir.joinpath("sql").joinpath(sql_file)
+    for sql_file in config.dependencies["sql"]
 ]
 
 
@@ -101,7 +102,7 @@ def hash_sources(ds: Datasource):
                 raise AttributeError("TODO: Hash cannot be performed on folder")
             with p.open("rb") as f:
                 hashes.append(sha256(f.read()).hexdigest())
-    except:
+    except Exception:
         raise AttributeError(f"TODO: Hash cannot be performed on {ds.name}")
     current_hash = sha256("".join(hashes).encode("UTF8")).hexdigest()[:7]
     return current_hash

@@ -144,7 +144,7 @@ class Datasource[T](ABC):
         """How to cache processed data."""
         self.data.write_ipc(self.cache_path)
         self.logger.info(f"Wrote cache file: {self.cache_path}")
-        metadata = self.cache_metadata()
+        # metadata = self.cache_metadata()  # TODO: implement
         # self.logger.info(f"Metadata (processed_by): {metadata.processed_by}")
         # self.logger.info(f"Metadata (version): {metadata.datasource_version}")
         # self.logger.info(f"Metadata (sources): {metadata.sources}")
@@ -169,7 +169,7 @@ class Datasource[T](ABC):
 
     def read_cache(self, *args, **kwargs) -> T:
         """Loads data attribute from cache file."""
-        h = "HASH"  # TODO: file hash/metadata
+        # h = "HASH"  # TODO: file hash/metadata
         if self.metadata.get("load_with_geopandas", False):
             self.data = gpd.read_feather(  # TODO: test this
                 self.cache_path, *args, **kwargs
