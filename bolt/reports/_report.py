@@ -9,11 +9,13 @@ from bolt.utils import config, make_logger
 
 class BaseReport(ABC):
     def __init__(self):
+        self.name = self.__class__.__name__
         self.logger = make_logger(
             self.__class__.__name__,
             config.log_dir,
         )
         self.data: dict[str, pd.DataFrame | None] = {}
+        self._exported = False
 
     def export(self, append_sheets: bool = False) -> None:
         """Exports the `self.data` attribute (dict[str, pd.DataFrame]) to
@@ -48,6 +50,7 @@ class BaseReport(ABC):
                 if sheet_name.startswith("_"):
                     continue
                 dataframe.to_excel(writer, sheet_name=sheet_name, index=False)
+        self._exported = True
         return
 
     @abstractmethod

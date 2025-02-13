@@ -7,6 +7,7 @@ from . import (
 from ._config import CONFIG_PATH, Config
 from ._download import download
 from ._logger import make_logger
+from ._rich import df_to_table
 from ._yearmonth import YearMonth
 
 config = Config()

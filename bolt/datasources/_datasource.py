@@ -7,6 +7,7 @@ from pathlib import Path
 from platform import node
 from typing import Annotated
 
+import duckdb
 import geopandas as gpd
 import pandas as pd
 import polars as pl
@@ -78,9 +79,6 @@ class Datasource[T](ABC):
                 "DataFrame or GeoDataFrame of processed data (created by `transform` or loaded from cache with `read_cache`)"
             ),
         ] = None
-
-        self.is_enriched: bool = False
-
         # self.logger.debug(f"Initialized {self.name}")
 
     @property
@@ -184,6 +182,13 @@ class Datasource[T](ABC):
         # Load cache metadata
         # TODO: json.load(.../cached/.metadata/{filename}) -> bolt.config.metadata[filename]
         return self
+
+    def read_table(self):
+        """Loads data attribute from database/warehouse table."""
+        db = duckdb.connect(config.warehouse_path)
+        self.data = pl.from_pandas(db.sql(f"SELECT * FROM {self.name}").df())
+        db.close()
+        return
 
     def validate(self):
         """Describe the rules that the data must adhere to before exported via `load`."""

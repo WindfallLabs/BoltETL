@@ -1,23 +1,29 @@
 import datetime as dt
 import time
-from fnmatch import fnmatch
-from hashlib import sha256
+
+# from fnmatch import fnmatch
+# from hashlib import sha256
 from pathlib import Path
 from typing import Literal
 
 import cyclopts
+
+# import polars as pl
+# import xlsxwriter
 from rich.console import Console
 
 import bolt
-from bolt.utils.file_tracker import FileTracker
+import bolt.warehouse
 
-__version__ = "0.0.3-dev"
+# from bolt.utils.file_tracker import FileTracker
+
+__version__ = "0.2.0-dev"
 t_start = time.time()  # Start process timer
 
 console = Console()
 app = cyclopts.App()
 
-tracker = FileTracker()
+# tracker = FileTracker()
 
 logo = """┏━━┓━━━━━┏┓━━┏┓━┏━━━┓┏━━━━┓┏┓━━━
 ┃┏┓┃━━━━━┃┃━┏┛┗┓┃┏━━┛┃┏┓┏┓┃┃┃━━━
@@ -37,23 +43,8 @@ for ds in bolt.config.metadata.keys():
 
 REPORTS: list = []
 
-
-def hash_sources(ds: bolt.datasources.Datasource):
-    hashes = []
-    try:
-        for p in ds.source_files:
-            p: Path = Path(p)
-            if p.is_dir():
-                raise AttributeError("TODO: Hash cannot be performed on folder")
-            with p.open("rb") as f:
-                hashes.append(sha256(f.read()).hexdigest())
-    except:
-        # return sha256(dt.date.today())[:7]
-        raise AttributeError(f"TODO: Hash cannot be performed on {ds.name}")
-    current_hash = sha256("".join(hashes).encode("UTF8")).hexdigest()[:7]
-    return current_hash
-
-
+# TODO: fix and re-implement
+'''
 @app.command
 def add(datafile: str):
     """Add data files to tracked data."""
@@ -110,12 +101,17 @@ def status():
         console.print("\n[green]No changes detected.[/]")
 
     return
+'''
 
 
 @app.command
-def report(option: Literal["list", "info", "run"], rpt_name: str = "", *args, **kwargs):
+def report(option: Literal["list", "info", "run"], rpt_name: str = "", *args, **kwargs):  # TODO: write: bool = True?
     """Execute a report by report class name with kwargs.
     Use `report-info <report name>` for details about a report.
+
+        Example
+        -------
+        `python bolt-cmd.py report run ParatransitNoShows --start=20250101 --end=20250131`
     """
     # NOTE: list option does not require 'rpt_name'
     if option == "list":
@@ -133,22 +129,25 @@ def report(option: Literal["list", "info", "run"], rpt_name: str = "", *args, **
     Rpt = getattr(bolt.reports, rpt_name)  # Get python class by name
     rpt = Rpt()
     if option == "info":
-        console.print(f"{rpt.run.__doc__}")
+        console.print(f"[green]{rpt.name}[/]")
+        console.print(f"[yellow]{rpt.run.__doc__}[/]")
         return
 
     if option == "run":
         console.print(f"Running report: {rpt_name}...")
         console.print(f"        (args={args})")
         console.print(f"        (kwargs={kwargs})")
-        console.print("        ...", end="\r")
+        #console.print("        ...", end="\r")
         try:
             rpt.run(*args, **kwargs)
-            console.print(f"        Exported results to '{rpt.out_path}'")
+            if rpt._exported:
+                console.print(f"        Exported results to '{rpt.out_path}'")
         except Exception as e:
             console.print(f"        [red]Failed: {e}")
     return
 
 
+# TODO: placeholder
 '''
 @app.command
 def task(
@@ -202,7 +201,6 @@ def update(
     db.sql(
         "CREATE TABLE IF NOT EXISTS data_updates (datasource VARCHAR PRIMARY KEY, last_updated DATE, hash VARCHAR(7));"
     )
-    # db.sql("CREATE TABLE IF NOT EXISTS source_files (datasource VARCHAR PRIMARY KEY, source_file VARCHAR PRIMARY KEY, hash VARCHAR, mod_date DATE);")
     db.close()
 
     # A list of errors to print
@@ -224,7 +222,7 @@ def update(
                 db = bolt.warehouse.connect()
 
                 ## Hash (sha256) the source files
-                current_hash = hash_sources(d)
+                current_hash = bolt.warehouse.hash_sources(d)
                 if not force:
                     # Ignore update for datasources with no changes to the source files
                     ## Get the last hash (sha256) of the source files
@@ -232,17 +230,22 @@ def update(
                         f"SELECT hash FROM data_updates WHERE datasource = '{d.name}'"
                     ).pl()["hash"]
                     ## Compare hashes and skip if they are the same
-                    if not update_hash.is_empty() and current_hash == update_hash.item():
-                        console.print(f"        [yellow]Skipped: {d.name} (unchanged)[/]")
+                    if (
+                        not update_hash.is_empty()
+                        and current_hash == update_hash.item()
+                    ):
+                        console.print(
+                            f"        [yellow]Skipped: {d.name} (unchanged)[/]"
+                        )
                         continue
-                with console.status(f"      Updating {d.name}..."):
+                with console.status(f"[cyan]      Updating {d.name}...[/]"):
                     df = d.update()
-                    schema = d.output_schema()
+                    # schema = d.output_schema()
                     # Write to database
                     db.sql(f"CREATE OR REPLACE TABLE {d.name} AS SELECT * FROM df")
-                    db.sql(
-                        f"CREATE OR REPLACE TABLE {d.name}_schema AS SELECT * FROM schema"
-                    )
+                    # db.sql(
+                    #    f"CREATE OR REPLACE TABLE {d.name}_schema AS SELECT * FROM schema"
+                    # )
 
                     db.sql(
                         f"INSERT OR REPLACE INTO data_updates VALUES ('{d.name}', '{dt.date.today()}', '{current_hash}')"
@@ -260,7 +263,7 @@ def update(
 
     # Update database
     console.print("\nUpdating database:")
-    if len(errors) > 0:
+    if len(errors) > 0 and not ignore_errors:
         skip_db = True  # Override the skip_db flag
 
     if skip_db:
@@ -269,6 +272,7 @@ def update(
         with console.status("Updating database:"):
             try:
                 sql_file_count, compact_msg = bolt.warehouse.update_sql(compact_db=True)
+                bolt.warehouse.create_schemas()
                 db_msg = (
                     f"        [green]Updated: {WAREHOUSE}[/]\n"
                     f"            SQL Files Executed: {sql_file_count}\n"
