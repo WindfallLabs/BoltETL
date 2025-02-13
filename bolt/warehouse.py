@@ -10,15 +10,14 @@ import xlsxwriter
 from bolt.datasources import Datasource
 from bolt.utils import config, funcs
 
-DB_PATH = config.warehouse_path
+DB_PATH = config.data_dir.joinpath(config.db_name)
 
 SQL_FUNCS = [
     funcs.fiscal_year,
 ]
 
-#SQL_FILES: list[Path] = config.sql_dir.rglob("[!_]*.sql")
 SQL_FILES: list[Path] = [
-    config.sql_dir.joinpath(sql_file) for sql_file in config.dependencies["sql"]
+    config.definitions_dir.joinpath("sql").joinpath(sql_file) for sql_file in config.dependencies["sql"]
 ]
 
 
