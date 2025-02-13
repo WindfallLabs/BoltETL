@@ -20,6 +20,7 @@ class Config:
         self.metadata = cfg["metadata"]
         self.holidays = cfg["holidays"]
         self.dependencies = cfg["dependencies"]
+        self.db_name = cfg["global"]["db_name"]
 
         # Globals
         for k, v in cfg["global"].items():

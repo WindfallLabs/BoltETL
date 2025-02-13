@@ -25,7 +25,6 @@ logo = """┏━━┓━━━━━┏┓━━┏┓━┏━━━┓┏━�
 ┗━━━┛┗━━┛┗━┛━┗━┛┗━━━┛━┗━━┛━┗━━━┛"""
 
 SCRIPT = Path(__file__).name
-WAREHOUSE = "data_warehouse.duckdb"
 
 # Populate a list of custom Datasource objects
 DATASOURCES: list[bolt.datasources.Datasource] = []
@@ -282,13 +281,13 @@ def update(
                 sql_file_count, compact_msg = bolt.warehouse.update_sql(compact_db=True)
                 bolt.warehouse.create_schemas()
                 db_msg = (
-                    f"        [green]Updated: {WAREHOUSE}[/]\n"
+                    f"        [green]Updated: {bolt.config.db_name}[/]\n"
                     f"            SQL Files Executed: {sql_file_count}\n"
                     f"            {compact_msg}"
                 )
             except Exception as e:
-                errors.append((WAREHOUSE, e))
-                db_msg = f"        [red]Failed: {WAREHOUSE}[/]"
+                errors.append((bolt.config.db_name, e))
+                db_msg = f"        [red]Failed: {bolt.config.db_name}[/]"
         console.print(db_msg)
 
     console.print(f"\nErrors: {len(errors)}")
