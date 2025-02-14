@@ -37,6 +37,7 @@ def connect() -> duckdb.DuckDBPyConnection:
     """Connect to the DuckDB data warehouse."""
     con = duckdb.connect(DB_PATH)
     load_funcs(con)
+    con.execute('PRAGMA disable_progress_bar;')
     return con
 
 

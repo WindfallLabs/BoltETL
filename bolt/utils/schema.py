@@ -1,15 +1,17 @@
 """Functions related to dataframe schemas."""
 
+from dateutil.parser import parse as parse_date
+from typing import Literal
+
 import pandas as pd
 import polars as pl
 
 
-def apply_dtypes(
+def enforce(
     df: pl.DataFrame,
     schema: tuple[tuple[str, pl.DataType]],
     sort=True,
-    ignore_missing=True,
-    date_format: str = "%m/%d/%Y",
+    handle_missing: Literal["add", "ignore", "raise"] = "raise"
 ) -> pl.DataFrame:
     """Casts existing columns of a DataFrame to the specified dtypes in a given schema.
     Ignores columns in the schema that don't exist.
@@ -19,17 +21,23 @@ def apply_dtypes(
     df : pl.DataFrame
         The dataframe to apply dtypes.
     schema : tuple[tuple[str, pl.DataType]]
-        A tuple of (column_name, datatype) that define the dtypes for the resulting dataframe.
+        A tuple of (column_name, datatype) that defines the columns and dtypes for the resulting dataframe.
+        It is assumed that the schema is a complete, or over-complete representation of the dataframe; thus
+          columns in the dataframe not specified by the schema will be dropped.
     sort : boolean (default True)
         Whether or not to sort resulting dataframe by column order in schema.
-    ignore_missing : boolean (default True)
-        Whether to throw an error over missing columns or not.
+    handle_missing : Literal["ignore", "add", "raise"]
+        How to handle column-dtypes that are in the schema and not in the dataframe
+            - "add" : adds a column with the name and dtype (null values)
+            - "ignore" : Does nothing
+            - "raise" : raises an error for each column in the dataframe not in the schema
 
         Examples
         --------
+        >>> from bolt.utils import schema
         >>> df = pl.DataFrame({"a": [1,2,3], "b": ["one", "two", "three"]})
-        >>> schema = (("a", pl.String), ("b", pl.String))
-        >>> apply_dtypes(df, schema)
+        >>> to_schema = (("a", pl.String), ("b", pl.String))
+        >>> schema.enforce(df, to_schema)
         pl.DataFrame({"a": ['1', '2', '3'], "b": ["one", "two", "three"]})
 
     """
@@ -38,18 +46,36 @@ def apply_dtypes(
     # Final cols to keep (sorted)
     select_columns = []
     for col, dtype in schema:
-        # Ignore missing
-        if col not in df.columns and ignore_missing:
-            continue
         # Get dtype name (str)
         try:
             dtype_name: str = dtype.__name__
         except AttributeError:
             dtype_name: str = dtype.__class__.__name__
-        # Keep None dtypes, but ignore casting
+
+        # Handle missing columns
+        if col not in df.columns:
+            # Ignore
+            if handle_missing == "ignore":
+                continue
+            # Add
+            elif handle_missing == "add":
+                expressions.append(
+                    pl.lit(None).cast(dtype).alias(col)
+                )
+                select_columns.append(col)
+                continue
+            # Raise KeyError
+            else:
+                raise KeyError(f"Dataframe does not have column: '{col}'")
+
+        # Keep None dtypes, but ignore casting  # TODO: remove?
+        #if col in df.columns and dtype is None:
+        #    select_columns.append(col)
+        #    continue
+        # Drop columns when their dtype is None
         if col in df.columns and dtype is None:
-            select_columns.append(col)
             continue
+
         # Add column to final dataframe selection order
         select_columns.append(col)
 
@@ -74,8 +100,13 @@ def apply_dtypes(
                     pd.to_timedelta(df.to_pandas()[col])
                 ).cast(dtype)
                 expressions.append(dur_expr)
-            elif dtype_name.startswith("Date"):
-                expressions.append(pl.col(col).str.strptime(pl.Date, date_format))
+            elif dtype_name == "Date":
+                expressions.append(pl.col(col).map_elements(lambda x: parse_date(x).date(), return_dtype=pl.Date()))
+                #expressions.append(pl.col(col).str.strptime(pl.Date, date_format))
+            elif dtype_name == "Datetime":
+                expressions.append(pl.col(col).map_elements(parse_date, return_dtype=pl.Datetime()))
+            elif dtype_name == "Time":
+                expressions.append(pl.col(col).map_elements(lambda x: parse_date(x).time(), return_dtype=pl.Time()))
             # TODO: elifs for other casting corrections here??
         else:
             expressions.append(pl.col(col).cast(dtype))
@@ -85,6 +116,10 @@ def apply_dtypes(
     if sort:
         df = df.select(select_columns)
     return df
+
+
+# Backwards compatible
+apply_dtypes = enforce
 
 
 def apply_sorting(
