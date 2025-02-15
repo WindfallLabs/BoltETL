@@ -66,6 +66,7 @@ class Datasource[T](ABC):
             raise KeyError(f"Name mismatch: '{self.name}' not in config.toml")
 
         # Cache path
+        # TODO: gpkg for spatial files?
         self.cache_path = config.cache_dir.joinpath(f'{self.metadata["name"]}.arrow')
 
         self.raw: Annotated[
@@ -142,8 +143,18 @@ class Datasource[T](ABC):
 
     def write_cache(self, *args, **kwargs) -> None:
         """How to cache processed data."""
-        self.data.write_ipc(self.cache_path)
-        self.logger.info(f"Wrote cache file: {self.cache_path}")
+        written = False
+        if isinstance(self.data, gpd.GeoDataFrame):
+            self.data.to_file(self.cache_path)
+            written = True
+        elif isinstance(self.data, pl.DataFrame):
+            self.data.write_ipc(self.cache_path)
+            written = True
+        elif isinstance(self.data, pd.DataFrame):
+            self.data.to_feather(self.cache_path)
+            written = True
+        if written:
+            self.logger.info(f"Wrote cache file: {self.cache_path}")
         # metadata = self.cache_metadata()  # TODO: implement
         # self.logger.info(f"Metadata (processed_by): {metadata.processed_by}")
         # self.logger.info(f"Metadata (version): {metadata.datasource_version}")
@@ -207,10 +218,10 @@ class Datasource[T](ABC):
         )
         return schema
 
-    def update(self):
+    def update(self, download=True):
         """Convenience method to combine Extract, Transform, and Cache methods."""
         self.logger.info("Beginning full update process")
-        if hasattr(self, "download"):
+        if hasattr(self, "download") and download:
             self.logger.info("'download' method found and running")
             self.download()
         self.extract()

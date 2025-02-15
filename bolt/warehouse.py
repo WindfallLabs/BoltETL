@@ -37,7 +37,10 @@ def connect() -> duckdb.DuckDBPyConnection:
     """Connect to the DuckDB data warehouse."""
     con = duckdb.connect(DB_PATH)
     load_funcs(con)
+    # Hide progress bars
     con.execute('PRAGMA disable_progress_bar;')
+    # Install spatial extension
+    con.execute("install spatial; load spatial;")
     return con
 
 
@@ -100,7 +103,8 @@ def hash_sources(ds: Datasource):
         for p in ds.source_files:
             p: Path = Path(p)
             if p.is_dir():
-                raise AttributeError("TODO: Hash cannot be performed on folder")
+                #raise AttributeError("TODO: Hash cannot be performed on folder")
+                continue
             with p.open("rb") as f:
                 hashes.append(sha256(f.read()).hexdigest())
     except Exception:

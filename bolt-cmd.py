@@ -4,6 +4,9 @@ from pathlib import Path
 from typing import Literal
 
 import cyclopts
+import geopandas as gpd
+import pandas as pd
+import polars as pl
 from rich.console import Console
 
 import bolt
@@ -181,6 +184,7 @@ def update(
     force=False,
     skip_db=False,
     ignore_errors=False,
+    download=True
 ):
     """Updates datasource by name, or all configured datasources ('.').
     Alternatively, update only the data warehouse using 'db'.
@@ -246,18 +250,19 @@ def update(
                         )
                         continue
                 with console.status(f"[cyan]      Updating {d.name}...[/]"):
-                    df = d.update()  # noqa: F841
+                    df = d.update(download)  # noqa: F841
                     # Write to database
-                    db.sql(f"CREATE OR REPLACE TABLE {d.name} AS SELECT * FROM df")
-                    # db.sql(
-                    #    f"CREATE OR REPLACE TABLE {d.name}_schema AS SELECT * FROM schema"
-                    # )
+                    if isinstance(df, gpd.GeoDataFrame):
+                        db.sql(f"CREATE OR REPLACE TABLE {d.name} AS SELECT * FROM st_read('{d.cache_path}');")
+                        tables_loaded += 1
+                    elif isinstance(df, (pl.DataFrame, pd.DataFrame)):
+                        db.sql(f"CREATE OR REPLACE TABLE {d.name} AS SELECT * FROM df")
+                        tables_loaded += 1
 
                     db.sql(
                         f"INSERT OR REPLACE INTO data_updates VALUES ('{d.name}', '{dt.date.today()}', '{current_hash}')"
                     )
                     console.print(f"        [green]Updated: {d.name}[/]")
-                    tables_loaded += 1
             except Exception as e:
                 errors.append((d.name, e))
                 console.print(f"        [red]Failed: {d.name}[/]")
