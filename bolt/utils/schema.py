@@ -145,10 +145,6 @@ def enforce(
     return df
 
 
-# Backwards compatible
-apply_dtypes = enforce
-
-
 def apply_sorting(
     df: pl.DataFrame, schema: tuple[tuple[str, pl.DataType]], drop_nonetypes=True
 ) -> pl.DataFrame:
