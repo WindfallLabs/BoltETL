@@ -247,7 +247,6 @@ def update(
                         continue
                 with console.status(f"[cyan]      Updating {d.name}...[/]"):
                     df = d.update()  # noqa: F841
-                    # schema = d.output_schema()
                     # Write to database
                     db.sql(f"CREATE OR REPLACE TABLE {d.name} AS SELECT * FROM df")
                     # db.sql(

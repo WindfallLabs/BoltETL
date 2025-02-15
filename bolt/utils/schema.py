@@ -11,7 +11,8 @@ def enforce(
     df: pl.DataFrame,
     schema: tuple[tuple[str, pl.DataType]],
     sort=True,
-    handle_missing: Literal["add", "ignore", "raise"] = "raise"
+    handle_missing: Literal["add", "ignore", "raise"] = "raise",
+    parse_dates=False
 ) -> pl.DataFrame:
     """Casts existing columns of a DataFrame to the specified dtypes in a given schema.
     Ignores columns in the schema that don't exist.
@@ -28,9 +29,11 @@ def enforce(
         Whether or not to sort resulting dataframe by column order in schema.
     handle_missing : Literal["ignore", "add", "raise"]
         How to handle column-dtypes that are in the schema and not in the dataframe
-            - "add" : adds a column with the name and dtype (null values)
-            - "ignore" : Does nothing
-            - "raise" : raises an error for each column in the dataframe not in the schema
+            - "add" : Adds a column with the name and dtype (null values)
+            - "ignore" : Does not raise errors when schema columns are not in the dataframe
+            - "raise" : Raises KeyErrors when columns in the schema are not in the dataframe
+    parse_dates : bool (default False)
+        Can be really slow, but a decent fallback when String columns refuse to convert to Date.
 
         Examples
         --------
@@ -68,10 +71,6 @@ def enforce(
             else:
                 raise KeyError(f"Dataframe does not have column: '{col}'")
 
-        # Keep None dtypes, but ignore casting  # TODO: remove?
-        #if col in df.columns and dtype is None:
-        #    select_columns.append(col)
-        #    continue
         # Drop columns when their dtype is None
         if col in df.columns and dtype is None:
             continue
@@ -88,11 +87,15 @@ def enforce(
         # Cast types
         if dtype is None:
             raise TypeError("Cannot cast type 'None'")
+
         # Handle conversions from string
         if orig_dtype == pl.String:
+            # Float ==========================================================
             if dtype_name.startswith("Float") or dtype_name.startswith("Int"):
                 #  Remove comma if cast to float|int
                 expressions.append(pl.col(col).str.replace(",", "").cast(dtype))
+
+            # Duration =======================================================
             elif dtype_name.startswith("Duration"):
                 # Durations must be parsed using pandas.to_timedelta, and converted back to pl.Series
                 dur_expr = pl.Series(
@@ -100,13 +103,37 @@ def enforce(
                     pd.to_timedelta(df.to_pandas()[col])
                 ).cast(dtype)
                 expressions.append(dur_expr)
+            # Date ===========================================================
             elif dtype_name == "Date":
-                expressions.append(pl.col(col).map_elements(lambda x: parse_date(x).date(), return_dtype=pl.Date()))
-                #expressions.append(pl.col(col).str.strptime(pl.Date, date_format))
+                if parse_dates:
+                    expressions.append((
+                        pl.col(col)
+                        .replace("", None)
+                        .map_elements(
+                            lambda x: parse_date(x).date(),
+                            return_dtype=pl.Date())
+                        )
+                    )
+                else:
+                    expressions.append(pl.col(col).replace("", None).cast(pl.Date()))
             elif dtype_name == "Datetime":
-                expressions.append(pl.col(col).map_elements(parse_date, return_dtype=pl.Datetime()))
+                if parse_dates:
+                    expressions.append((
+                        pl.col(col)
+                        .replace("", None)
+                        .map_elements(parse_date, return_dtype=pl.Datetime()))
+                    )
+                else:
+                    expressions.append(pl.col(col).replace("", None).cast(pl.Datetime()))
             elif dtype_name == "Time":
-                expressions.append(pl.col(col).map_elements(lambda x: parse_date(x).time(), return_dtype=pl.Time()))
+                if parse_dates:
+                    expressions.append((
+                        pl.col(col)
+                        .replace("", None)
+                        .map_elements(lambda x: parse_date(x).time(), return_dtype=pl.Time()))
+                    )
+                else:
+                    expressions.append(pl.col(col).replace("", None).cast(pl.Time()))
             # TODO: elifs for other casting corrections here??
         else:
             expressions.append(pl.col(col).cast(dtype))
