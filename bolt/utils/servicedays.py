@@ -41,14 +41,27 @@ class CalendarDim():
     def __init__(self):
         """Create the Calendar dimension (`dim_calendar` table)."""
         self.years = list(range(2020, dt.date.today().year + HORIZON))
+        # Additional VIEWs based on dim_calendar
+        self.views = [
+            "CREATE OR REPLACE VIEW dimv_service_days AS SELECT YMTH, Service, COUNT(Service) AS Days FROM dim_calendar GROUP BY YMTH, Service ORDER BY YMTH, Service",
+            # A VIEW for NTD S-10 "Services Operated (Days)""
+            "CREATE OR REPLACE VIEW view_services_operated AS SELECT FY, Service, COUNT(Service) AS Days FROM dim_calendar GROUP BY FY, Service ORDER BY FY, Service",
+            "CREATE OR REPLACE VIEW dimv_month_days AS SELECT YMTH, Service, COUNT(Service) AS Days FROM dim_calendar GROUP BY YMTH, Service ORDER BY YMTH, Service",
+            "",  # TODO: replace servicedays functions with VIEWs?
+        ]
 
         # Dataframe of holiday dates and service
         holiday_dates = (
             # Get all holiday dates
-            pl.DataFrame(
-                [(k, v) for k, v in holidays.US(years=self.years).items()],
-                schema=["Date", "Holiday"],
-                orient="row",
+            (
+                pl.DataFrame(
+                    [(k, v) for k, v in holidays.US(years=self.years).items()],
+                    schema=["Date", "HolidayName"],
+                    orient="row",
+                )
+                .with_columns(
+                    pl.col("HolidayName").str.replace("(observed)", "").strip_chars(" ")
+                )
             )
             .join(
                 # Get Agency's holidays and service
@@ -85,8 +98,8 @@ class CalendarDim():
         df = (
             pl.concat(zips, how="vertical")
             .with_columns(
-                # Get service type for holidays
-                pl.when(pl.col("Service").is_null())
+                # Get service type for holidays (convert "Normal" appropriately)
+                pl.when((pl.col("Service").is_null()) | (pl.col("Service") == "Normal"))
                 .then(
                     pl.when(pl.col("DayName").is_in(["Saturday", "Sunday"]))
                     .then(pl.col("DayName"))
@@ -133,6 +146,8 @@ class CalendarDim():
 
         # Validate agency holidays
         for k, v in config.holidays.items():
+            if v == "Normal":
+                continue
             assert df.filter(pl.col("Holiday") == k)["Service"].unique().item() == v
         
         self.data = df
