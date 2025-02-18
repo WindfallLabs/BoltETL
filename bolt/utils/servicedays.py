@@ -32,6 +32,107 @@ __changelog__ = """
 calendar.setfirstweekday(1)
 
 
+class CalendarDim():
+    def __init__(self):
+        """Create the Calendar dimension (`dim_calendar` table)."""
+        self.years = list(range(2020, dt.date.today().year + 5))
+
+        # Dataframe of holiday dates and service
+        holiday_dates = (
+            # Get all holiday dates
+            pl.DataFrame(
+                [(k, v) for k, v in holidays.US(years=self.years).items()],
+                schema=["Date", "Holiday"],
+                orient="row",
+            )
+            .join(
+                # Get Agency's holidays and service
+                pl.DataFrame(
+                    [(k, v) for k, v in config.holidays.items()],
+                    schema=["Holiday", "Service"],
+                    orient="row",
+                ),
+                on="Holiday")
+        )
+
+        # Dataframe of full calendar
+        cal = calendar.Calendar()
+        zips = []
+        for year in self.years:
+            for m in range(1, 13):
+                cal_zip = zip(cal.itermonthdays(year, m), cycle(calendar.day_name))
+                zips.append(
+                    # Get full calendar
+                    pl.DataFrame(
+                        [
+                            (dt.date(year, m, day), day_name)
+                            for day, day_name in cal_zip
+                            if day > 0
+                        ],
+                        schema=["Date", "DayName"],
+                        orient="row",
+                    )
+                    # Join with holidays
+                    .join(holiday_dates, on="Date", how="left")
+                )
+
+        # Full dataframe of full calendar, holidays, and other date-dimensional info        
+        df = (
+            pl.concat(zips, how="vertical")
+            .with_columns(
+                # Get service type for holidays
+                pl.when(pl.col("Service").is_null())
+                .then(
+                    pl.when(pl.col("DayName").is_in(["Saturday", "Sunday"]))
+                    .then(pl.col("DayName"))
+                    .otherwise(pl.lit("Weekday"))
+                )
+                .otherwise(pl.col("Service"))
+                .alias("Service"),
+                # Get Year
+                pl.col("Date").dt.year().alias("Year"),
+                # Get Year-Month (YMTH)
+                pl.col("Date").dt.strftime("%Y%m").cast(pl.Int64).alias("YMTH"),
+                # Get Fiscal Year
+                (
+                    pl.when(pl.col("Date").dt.month() >= 7)
+                    .then(pl.col("Date").dt.year() + 1)
+                    .otherwise(pl.col("Date").dt.year())
+                    .alias("FY")
+                ),
+                # Month
+                pl.col("Date").dt.month().alias("Month"),
+                # Quarter
+                pl.col("Date").dt.quarter().alias("Quarter"),
+                # Fiscal Quarter
+                (
+                    pl.col("Date").dt.quarter()
+                    .map_elements(
+                        lambda x: {1: 3, 2: 4, 3: 1, 4: 2}[x], return_dtype=pl.Int8)
+                    .alias("FQ")
+                ),
+            )
+            .select(
+                "Date",
+                "YMTH",
+                "Year",
+                "FY",
+                "Quarter",
+                "FQ",
+                "Month",
+                "DayName",
+                "Holiday",
+                "Service"
+            )
+        )
+
+        # Validate agency holidays
+        for k, v in config.holidays.items():
+            assert df.filter(pl.col("Holiday") == k)["Service"].unique().item() == v
+        
+        self.data = df
+
+
 def get_holiday_service(year: int, drop_observed=False) -> pl.DataFrame:
     """Returns a DataFrame of holidays and the service provided by MUTD."""
     # Convert holiday config to DataFrame

@@ -6,6 +6,7 @@ _Second Alpha Release Notes_
 Added:
 
 Changed:
-- Now primarily leverages `polars` rather than `pandas`
+- Now (primarily) leverages `polars` rather than `pandas`
 - The `extract` method uses polar's lazy mode (by default) to load raw data (but not for xlsx)
 - Cached data uses the `write_icp` and ".arrow" extension
+- Began replacing `bolt.utils.servicedays` functions with SQL table "dim_calendar"
