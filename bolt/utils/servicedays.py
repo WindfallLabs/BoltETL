@@ -27,7 +27,12 @@ __changelog__ = """
 - Added `add_service_days`
 0.3.0 (2025-02-01):
 - Changed: refactored to use polars rather than pandas
+0.3.1 (2025-02-18)
+- Added CalendarDim class to create `dim_calendar` SQL table
 """
+
+# Years ahead
+HORIZON = 5
 
 calendar.setfirstweekday(1)
 
@@ -35,7 +40,7 @@ calendar.setfirstweekday(1)
 class CalendarDim():
     def __init__(self):
         """Create the Calendar dimension (`dim_calendar` table)."""
-        self.years = list(range(2020, dt.date.today().year + 5))
+        self.years = list(range(2020, dt.date.today().year + HORIZON))
 
         # Dataframe of holiday dates and service
         holiday_dates = (

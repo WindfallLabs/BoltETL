@@ -9,6 +9,7 @@ import xlsxwriter
 
 from bolt.datasources import Datasource
 from bolt.utils import config, funcs
+from bolt.utils.servicedays import CalendarDim  # TODO: watch for changes here
 
 DB_PATH = config.data_dir.joinpath(config.db_name)
 
@@ -115,6 +116,9 @@ def hash_sources(ds: Datasource):
 
 def update_sql(compact_db=False) -> tuple[int, str]:
     """Update the DuckDB data warehouse."""
+    with duckdb.connect(DB_PATH) as con:
+        calendar_dim = CalendarDim().data  # noqa: F841
+        con.sql("CREATE OR REPLACE TABLE dim_calendar AS SELECT * FROM calendar_dim;")
     # Execute SQL from files
     sql_file_count = 0
     for sql_file in SQL_FILES:
