@@ -6,7 +6,7 @@ import polars as pl
 
 
 class YearMonth[T]:
-    dtype = pl.String
+    dtype = pl.Int64
 
     def __init__(self, yearmonth: str | int):
         self.yearmonth = int(yearmonth)  # Remove?
@@ -23,7 +23,7 @@ class YearMonth[T]:
     def from_date_series(cls, date_col: pl.Expr) -> pl.Expr:
         return date_col.map_elements(
             lambda x: str(cls.from_date(x)), return_dtype=cls.dtype
-        ).alias("YMTH")
+        ).cast(pl.Int64).alias("YMTH")
 
     @classmethod
     def from_date_string(cls, date_str: str, format: str) -> T:
@@ -47,7 +47,7 @@ class YearMonth[T]:
 
     def as_series(self, col_name: str = "YMTH") -> pl.Series:
         """Return an expression defining a YMTH column literal."""
-        return pl.lit(self.yearmonth, dtype=self.dtype).alias(col_name)
+        return pl.lit(self.yearmonth, dtype=self.dtype).cast(pl.Int64).alias(col_name)
 
     def __repr__(self):
         return f"<YearMonth: {self.yearmonth}>"

@@ -60,7 +60,7 @@ class CalendarDim():
                     orient="row",
                 )
                 .with_columns(
-                    pl.col("HolidayName").str.replace("(observed)", "").strip_chars(" ")
+                    pl.col("HolidayName").str.replace("(observed)", "").strip_chars(" ").alias("Holiday")
                 )
             )
             .join(
@@ -302,7 +302,7 @@ def get_service_days(year: int, month: int) -> pl.DataFrame:
     df = pl.concat([df, df.sum().fill_null("Total")])
     # Display the target time period (yearmonth)
     df = df.with_columns(
-        pl.lit(str(year) + str(month).zfill(2), dtype=pl.String).alias("YMTH"),
+        pl.lit(str(year) + str(month).zfill(2), dtype=pl.String).cast(pl.Int64).alias("YMTH"),
         pl.col("DayName").alias("DayCount"),
         pl.col("Holiday").alias("HolidayCount"),
     ).select("YMTH", "Service", "DayCount", "HolidayCount")  # ServiceType
@@ -329,7 +329,7 @@ def add_service(df: pl.DataFrame, ymth_col: str = "YMTH"):
 
 
 def add_service_days(
-    df: pl.DataFrame, ymth_col: str = "YMTH", service_col: str = "Service"
+    df: pl.DataFrame, ymth_col: int = "YMTH", service_col: str = "Service"
 ):
     """Adds a new 'Service Days' column to a DataFrame given a Year-Month
     column and 'Service' column."""

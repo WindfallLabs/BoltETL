@@ -102,6 +102,8 @@ class Datasource[T](ABC):
 
     def extract(self):
         """Open the raw data source file(s). Can be over-written to customize."""
+        if len(self.source_files) == 0:
+            raise AttributeError(f"Datasource `{self.name}` has no source files")
         ext = self.metadata["filename"].split(".")[-1].lower()
         if self.metadata.get("load_with_geopandas", False):
             # TODO: would we ever read multiple?
@@ -117,7 +119,7 @@ class Datasource[T](ABC):
                 ]
             else:
                 self.raw = [
-                    (p, read_func(p, schema_overrides=self.schema_overrides))
+                    (p, read_func(p, schema_overrides=self.schema_overrides, infer_schema_length=10000))
                     for p in self.source_files
                 ]
             self.logger.debug("Extracted raw data")
