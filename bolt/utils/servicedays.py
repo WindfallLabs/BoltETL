@@ -60,7 +60,7 @@ class CalendarDim():
                     orient="row",
                 )
                 .with_columns(
-                    pl.col("HolidayName").str.replace("(observed)", "").strip_chars(" ").alias("Holiday")
+                    pl.col("HolidayName").str.replace("(observed)", "").str.strip_chars(" ").alias("Holiday")
                 )
             )
             .join(
@@ -329,7 +329,7 @@ def add_service(df: pl.DataFrame, ymth_col: str = "YMTH"):
 
 
 def add_service_days(
-    df: pl.DataFrame, ymth_col: int = "YMTH", service_col: str = "Service"
+    df: pl.DataFrame, ymth_col: str = "YMTH", service_col: str = "Service"
 ):
     """Adds a new 'Service Days' column to a DataFrame given a Year-Month
     column and 'Service' column."""

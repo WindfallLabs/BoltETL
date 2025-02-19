@@ -85,8 +85,9 @@ def enforce(
             continue
 
         # Cast types
-        if dtype is None:
-            raise TypeError("Cannot cast type 'None'")
+        #if dtype is None:
+        #    raise TypeError("Cannot cast type 'None'")
+        # TODO: remove?
 
         # Handle conversions from string
         if orig_dtype == pl.String:

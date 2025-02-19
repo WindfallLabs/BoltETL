@@ -116,6 +116,7 @@ def hash_sources(ds: Datasource):
 
 def update_sql(compact_db=False) -> tuple[int, str]:
     """Update the DuckDB data warehouse."""
+    # Execute built-in 
     with duckdb.connect(DB_PATH) as con:
         calendar_dim = CalendarDim().data  # noqa: F841
         con.sql("CREATE OR REPLACE TABLE dim_calendar AS SELECT * FROM calendar_dim;")
