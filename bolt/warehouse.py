@@ -39,7 +39,7 @@ def connect() -> duckdb.DuckDBPyConnection:
     con = duckdb.connect(DB_PATH)
     load_funcs(con)
     # Hide progress bars
-    con.execute('PRAGMA disable_progress_bar;')
+    con.execute("PRAGMA disable_progress_bar;")
     # Install spatial extension
     con.execute("install spatial; load spatial;")
     return con
@@ -104,7 +104,7 @@ def hash_sources(ds: Datasource):
         for p in ds.source_files:
             p: Path = Path(p)
             if p.is_dir():
-                #raise AttributeError("TODO: Hash cannot be performed on folder")
+                # raise AttributeError("TODO: Hash cannot be performed on folder")
                 continue
             with p.open("rb") as f:
                 hashes.append(sha256(f.read()).hexdigest())
@@ -116,7 +116,7 @@ def hash_sources(ds: Datasource):
 
 def update_sql(compact_db=False) -> tuple[int, str]:
     """Update the DuckDB data warehouse."""
-    # Execute built-in 
+    # Execute built-in
     with duckdb.connect(DB_PATH) as con:
         calendar_dim = CalendarDim().data  # noqa: F841
         con.sql("CREATE OR REPLACE TABLE dim_calendar AS SELECT * FROM calendar_dim;")

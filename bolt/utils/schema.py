@@ -1,10 +1,10 @@
 """Functions related to dataframe schemas."""
 
-from dateutil.parser import parse as parse_date
 from typing import Literal
 
 import pandas as pd
 import polars as pl
+from dateutil.parser import parse as parse_date
 
 
 def enforce(
@@ -12,7 +12,7 @@ def enforce(
     schema: tuple[tuple[str, pl.DataType]],
     sort=True,
     handle_missing: Literal["add", "ignore", "raise"] = "raise",
-    parse_dates=False
+    parse_dates=False,
 ) -> pl.DataFrame:
     """Casts existing columns of a DataFrame to the specified dtypes in a given schema.
     Ignores columns in the schema that don't exist.
@@ -62,9 +62,7 @@ def enforce(
                 continue
             # Add
             elif handle_missing == "add":
-                expressions.append(
-                    pl.lit(None).cast(dtype).alias(col)
-                )
+                expressions.append(pl.lit(None).cast(dtype).alias(col))
                 select_columns.append(col)
                 continue
             # Raise KeyError
@@ -85,7 +83,7 @@ def enforce(
             continue
 
         # Cast types
-        #if dtype is None:
+        # if dtype is None:
         #    raise TypeError("Cannot cast type 'None'")
         # TODO: remove?
 
@@ -107,31 +105,40 @@ def enforce(
             # Date ===========================================================
             elif dtype_name == "Date":
                 if parse_dates:
-                    expressions.append((
-                        pl.col(col)
-                        .replace("", None)
-                        .map_elements(
-                            lambda x: parse_date(x).date(),
-                            return_dtype=pl.Date())
+                    expressions.append(
+                        (
+                            pl.col(col)
+                            .replace("", None)
+                            .map_elements(
+                                lambda x: parse_date(x).date(), return_dtype=pl.Date()
+                            )
                         )
                     )
                 else:
                     expressions.append(pl.col(col).replace("", None).cast(pl.Date()))
             elif dtype_name == "Datetime":
                 if parse_dates:
-                    expressions.append((
-                        pl.col(col)
-                        .replace("", None)
-                        .map_elements(parse_date, return_dtype=pl.Datetime()))
+                    expressions.append(
+                        (
+                            pl.col(col)
+                            .replace("", None)
+                            .map_elements(parse_date, return_dtype=pl.Datetime())
+                        )
                     )
                 else:
-                    expressions.append(pl.col(col).replace("", None).cast(pl.Datetime()))
+                    expressions.append(
+                        pl.col(col).replace("", None).cast(pl.Datetime())
+                    )
             elif dtype_name == "Time":
                 if parse_dates:
-                    expressions.append((
-                        pl.col(col)
-                        .replace("", None)
-                        .map_elements(lambda x: parse_date(x).time(), return_dtype=pl.Time()))
+                    expressions.append(
+                        (
+                            pl.col(col)
+                            .replace("", None)
+                            .map_elements(
+                                lambda x: parse_date(x).time(), return_dtype=pl.Time()
+                            )
+                        )
                     )
                 else:
                     expressions.append(pl.col(col).replace("", None).cast(pl.Time()))

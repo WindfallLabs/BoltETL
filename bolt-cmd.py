@@ -184,7 +184,7 @@ def update(
     force=False,
     skip_db=False,
     ignore_errors=False,
-    download=True
+    download=True,
 ):
     """Updates datasource by name, or all configured datasources ('.').
     Alternatively, update only the data warehouse using 'db'.
@@ -253,7 +253,9 @@ def update(
                     df = d.update(download)  # noqa: F841
                     # Write to database
                     if isinstance(df, gpd.GeoDataFrame):
-                        db.sql(f"CREATE OR REPLACE TABLE {d.name} AS SELECT * FROM st_read('{d.cache_path}');")
+                        db.sql(
+                            f"CREATE OR REPLACE TABLE {d.name} AS SELECT * FROM st_read('{d.cache_path}');"
+                        )
                         tables_loaded += 1
                     elif isinstance(df, (pl.DataFrame, pd.DataFrame)):
                         db.sql(f"CREATE OR REPLACE TABLE {d.name} AS SELECT * FROM df")

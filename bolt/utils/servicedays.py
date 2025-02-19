@@ -37,7 +37,7 @@ HORIZON = 5
 calendar.setfirstweekday(1)
 
 
-class CalendarDim():
+class CalendarDim:
     def __init__(self):
         """Create the Calendar dimension (`dim_calendar` table)."""
         self.years = list(range(2020, dt.date.today().year + HORIZON))
@@ -58,19 +58,21 @@ class CalendarDim():
                     [(k, v) for k, v in holidays.US(years=self.years).items()],
                     schema=["Date", "HolidayName"],
                     orient="row",
+                ).with_columns(
+                    pl.col("HolidayName")
+                    .str.replace("(observed)", "")
+                    .str.strip_chars(" ")
+                    .alias("Holiday")
                 )
-                .with_columns(
-                    pl.col("HolidayName").str.replace("(observed)", "").str.strip_chars(" ").alias("Holiday")
-                )
-            )
-            .join(
+            ).join(
                 # Get Agency's holidays and service
                 pl.DataFrame(
                     [(k, v) for k, v in config.holidays.items()],
                     schema=["Holiday", "Service"],
                     orient="row",
                 ),
-                on="Holiday")
+                on="Holiday",
+            )
         )
 
         # Dataframe of full calendar
@@ -94,7 +96,7 @@ class CalendarDim():
                     .join(holiday_dates, on="Date", how="left")
                 )
 
-        # Full dataframe of full calendar, holidays, and other date-dimensional info        
+        # Full dataframe of full calendar, holidays, and other date-dimensional info
         df = (
             pl.concat(zips, how="vertical")
             .with_columns(
@@ -124,9 +126,11 @@ class CalendarDim():
                 pl.col("Date").dt.quarter().alias("Quarter"),
                 # Fiscal Quarter
                 (
-                    pl.col("Date").dt.quarter()
+                    pl.col("Date")
+                    .dt.quarter()
                     .map_elements(
-                        lambda x: {1: 3, 2: 4, 3: 1, 4: 2}[x], return_dtype=pl.Int8)
+                        lambda x: {1: 3, 2: 4, 3: 1, 4: 2}[x], return_dtype=pl.Int8
+                    )
                     .alias("FQ")
                 ),
             )
@@ -140,7 +144,7 @@ class CalendarDim():
                 "Month",
                 "DayName",
                 "Holiday",
-                "Service"
+                "Service",
             )
         )
 
@@ -149,7 +153,7 @@ class CalendarDim():
             if v == "Normal":
                 continue
             assert df.filter(pl.col("Holiday") == k)["Service"].unique().item() == v
-        
+
         self.data = df
 
 
@@ -302,7 +306,9 @@ def get_service_days(year: int, month: int) -> pl.DataFrame:
     df = pl.concat([df, df.sum().fill_null("Total")])
     # Display the target time period (yearmonth)
     df = df.with_columns(
-        pl.lit(str(year) + str(month).zfill(2), dtype=pl.String).cast(pl.Int64).alias("YMTH"),
+        pl.lit(str(year) + str(month).zfill(2), dtype=pl.String)
+        .cast(pl.Int64)
+        .alias("YMTH"),
         pl.col("DayName").alias("DayCount"),
         pl.col("Holiday").alias("HolidayCount"),
     ).select("YMTH", "Service", "DayCount", "HolidayCount")  # ServiceType

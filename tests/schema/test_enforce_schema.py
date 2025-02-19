@@ -1,4 +1,5 @@
 """Test schema enforce function."""
+
 import datetime as dt
 import sys
 
@@ -10,10 +11,12 @@ from bolt.utils import schema
 
 
 def test_enforce_numeric():
-    df = pl.DataFrame({
-        "str_int": ["42", "12,345"],
-        "str_float": ["42.0", "12,345.01"],
-    })
+    df = pl.DataFrame(
+        {
+            "str_int": ["42", "12,345"],
+            "str_float": ["42.0", "12,345.01"],
+        }
+    )
     to_schema = (
         ("str_int", pl.Int32()),
         ("str_float", pl.Float64()),
@@ -24,10 +27,12 @@ def test_enforce_numeric():
 
 
 def test_enforce_dates():
-    df = pl.DataFrame({
-        "date": [dt.date(2025, 1, 1), dt.date(2025, 2, 2)],
-        "str_date": ["2025-01-01", "2025-02-02"],
-    })
+    df = pl.DataFrame(
+        {
+            "date": [dt.date(2025, 1, 1), dt.date(2025, 2, 2)],
+            "str_date": ["2025-01-01", "2025-02-02"],
+        }
+    )
     to_schema = (
         ("date", pl.Date()),
         ("str_date", pl.Date()),
@@ -39,10 +44,15 @@ def test_enforce_dates():
 
 
 def test_enforce_datetimes():
-    df = pl.DataFrame({
-        "datetime": [dt.datetime(2025, 1, 1, 14, 25), dt.datetime(2025, 2, 2, 15, 45)],
-        "str_datetime": ["2025-01-01 02:25:00.00 PM", "2025-02-02 03:45:00.00 PM"],
-    })
+    df = pl.DataFrame(
+        {
+            "datetime": [
+                dt.datetime(2025, 1, 1, 14, 25),
+                dt.datetime(2025, 2, 2, 15, 45),
+            ],
+            "str_datetime": ["2025-01-01 02:25:00.00 PM", "2025-02-02 03:45:00.00 PM"],
+        }
+    )
     to_schema = (
         ("datetime", pl.Datetime()),
         ("str_datetime", pl.Datetime()),
@@ -54,10 +64,12 @@ def test_enforce_datetimes():
 
 
 def test_enforce_times():
-    df = pl.DataFrame({
-        "time": [dt.time(14, 25), dt.time(15, 45)],
-        "str_time": ["02:25:00.00 PM", "03:45:00.00 PM"],
-    })
+    df = pl.DataFrame(
+        {
+            "time": [dt.time(14, 25), dt.time(15, 45)],
+            "str_time": ["02:25:00.00 PM", "03:45:00.00 PM"],
+        }
+    )
     to_schema = (
         ("time", pl.Time()),
         ("str_time", pl.Time()),
@@ -69,10 +81,15 @@ def test_enforce_times():
 
 
 def test_enforce_durations():
-    df = pl.DataFrame({
-        "duration": [dt.timedelta(hours=2, minutes=25), dt.timedelta(hours=3, minutes=45)],
-        "str_duration": ["02:25:00.00", "03:45:00.00"],
-    })
+    df = pl.DataFrame(
+        {
+            "duration": [
+                dt.timedelta(hours=2, minutes=25),
+                dt.timedelta(hours=3, minutes=45),
+            ],
+            "str_duration": ["02:25:00.00", "03:45:00.00"],
+        }
+    )
     to_schema = (
         ("duration", pl.Duration()),
         ("str_duration", pl.Duration()),
@@ -84,25 +101,20 @@ def test_enforce_durations():
 
 
 def test_enforce_drop_none():
-    df = pl.DataFrame({
-        "id": [0, 1],
-        "TO_DROP": ["some", "values"]
-    })
+    df = pl.DataFrame({"id": [0, 1], "TO_DROP": ["some", "values"]})
     to_schema = (
         ("id", pl.Int8()),
-        ("TO_DROP", None)  # <-- Column to drop
+        ("TO_DROP", None),  # <-- Column to drop
     )
     result = schema.enforce(df, to_schema)
     assert result.columns == ["id"]
 
 
 def test_enforce_handle_missing():
-    df = pl.DataFrame({
-        "id": [0, 1]
-    })
+    df = pl.DataFrame({"id": [0, 1]})
     to_schema = (
         ("id", pl.Int8()),
-        ("MISSING", pl.String())  # <-- Missing column and how to handle it
+        ("MISSING", pl.String()),  # <-- Missing column and how to handle it
     )
     # Raise
     with pytest.raises(KeyError):

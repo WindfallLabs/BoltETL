@@ -119,7 +119,14 @@ class Datasource[T](ABC):
                 ]
             else:
                 self.raw = [
-                    (p, read_func(p, schema_overrides=self.schema_overrides, infer_schema_length=10000))
+                    (
+                        p,
+                        read_func(
+                            p,
+                            schema_overrides=self.schema_overrides,
+                            infer_schema_length=10000,
+                        ),
+                    )
                     for p in self.source_files
                 ]
             self.logger.debug("Extracted raw data")

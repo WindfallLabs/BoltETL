@@ -10,9 +10,9 @@ class YearMonth[T]:
 
     def __init__(self, yearmonth: str | int):
         yearmonth_str = str(yearmonth)
-        if not re.match(r'^\d{6}$', yearmonth_str):
+        if not re.match(r"^\d{6}$", yearmonth_str):
             raise ValueError("YearMonth must be a 6-digit number (YYYYMM)")
-        
+
         self._year = int(yearmonth_str[:4])
         self._month = int(yearmonth_str[4:])
         if not (1 <= self.month <= 12):
@@ -43,9 +43,13 @@ class YearMonth[T]:
 
     @classmethod
     def from_date_series(cls, date_col: pl.Expr) -> pl.Expr:
-        return date_col.map_elements(
-            lambda x: int(cls.from_date(x)), return_dtype=cls.dtype
-        ).cast(pl.Int64).alias("YMTH")
+        return (
+            date_col.map_elements(
+                lambda x: int(cls.from_date(x)), return_dtype=cls.dtype
+            )
+            .cast(pl.Int64)
+            .alias("YMTH")
+        )
 
     @classmethod
     def from_date_string(cls, date_str: str, format: str) -> T:
@@ -79,22 +83,22 @@ class YearMonth[T]:
     def __hash__(self) -> int:
         return hash(self._yearmonth)
 
-    def __lt__(self, other: 'YearMonth') -> bool:
+    def __lt__(self, other: "YearMonth") -> bool:
         if not isinstance(other, YearMonth):
             raise TypeError("Type must be YearMonth")
         return self._yearmonth < other._yearmonth
 
-    def __le__(self, other: 'YearMonth') -> bool:
+    def __le__(self, other: "YearMonth") -> bool:
         if not isinstance(other, YearMonth):
             raise TypeError("Type must be YearMonth")
         return self._yearmonth <= other._yearmonth
 
-    def __gt__(self, other: 'YearMonth') -> bool:
+    def __gt__(self, other: "YearMonth") -> bool:
         if not isinstance(other, YearMonth):
             raise TypeError("Type must be YearMonth")
         return self._yearmonth > other._yearmonth
 
-    def __ge__(self, other: 'YearMonth') -> bool:
+    def __ge__(self, other: "YearMonth") -> bool:
         if not isinstance(other, YearMonth):
             raise TypeError("Type must be YearMonth")
         return self._yearmonth >= other._yearmonth

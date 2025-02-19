@@ -1,7 +1,7 @@
 """Tests for YearMonth object."""
 
-import sys
 import datetime as dt
+import sys
 from pathlib import Path
 
 import polars as pl
@@ -50,9 +50,7 @@ def test_from_date():
 
 def test_from_date_series():
     df = pl.DataFrame({"dates": [dt.date(2024, 1, 1), dt.date(2024, 2, 1)]})
-    df = df.with_columns(
-        YearMonth.from_date_series(pl.col("dates"))
-    )
+    df = df.with_columns(YearMonth.from_date_series(pl.col("dates")))
     expected = pl.Series("YMTH", [202401, 202402])
     assert df["YMTH"].equals(expected)
 
@@ -98,9 +96,7 @@ def test_to_year_and_month():
 
 
 def test_as_series():
-    df = pl.DataFrame().with_columns(
-        YearMonth(202502).as_series()
-    )
+    df = pl.DataFrame().with_columns(YearMonth(202502).as_series())
     expected = pl.Series("YMTH", [202502])
     assert df["YMTH"].equals(expected)
 
@@ -139,12 +135,15 @@ def test_comparisons():
 
 
 # Property-based tests for valid ranges
-@pytest.mark.parametrize("year,month", [
-    (2024, 1),
-    (2024, 12),
-    (1900, 1),
-    (2100, 12),
-])
+@pytest.mark.parametrize(
+    "year,month",
+    [
+        (2024, 1),
+        (2024, 12),
+        (1900, 1),
+        (2100, 12),
+    ],
+)
 def test_valid_year_month_combinations(year, month):
     yearmonth = int(f"{year}{month:02d}")
     ym = YearMonth(yearmonth)
