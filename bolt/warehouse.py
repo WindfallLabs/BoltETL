@@ -30,7 +30,10 @@ def load_funcs(con: duckdb.DuckDBPyConnection) -> None:
             con.remove_function(fn.__name__)
         except duckdb.InvalidInputException:
             pass
-        con.create_function(fn.__name__, fn)  # TODO: might throw a CatalogException
+        try:
+            con.create_function(fn.__name__, fn)
+        except duckdb.CatalogException:
+            pass
     return
 
 
