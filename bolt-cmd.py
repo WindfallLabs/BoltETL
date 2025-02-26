@@ -3,6 +3,8 @@ import time
 from pathlib import Path
 from typing import Literal
 
+t_init_start = time.time()
+
 import cyclopts
 import geopandas as gpd
 import pandas as pd
@@ -13,12 +15,9 @@ import bolt
 import bolt.warehouse
 
 __version__ = "0.2.0-dev"
-t_start = time.time()  # Start process timer
 
 console = Console()
 app = cyclopts.App()
-
-# tracker = FileTracker()
 
 logo = """┏━━┓━━━━━┏┓━━┏┓━┏━━━┓┏━━━━┓┏┓━━━
 ┃┏┓┃━━━━━┃┃━┏┛┗┓┃┏━━┛┃┏┓┏┓┃┃┃━━━
@@ -29,109 +28,102 @@ logo = """┏━━┓━━━━━┏┓━━┏┓━┏━━━┓┏━�
 
 SCRIPT = Path(__file__).name
 
-# Populate a list of custom Datasource objects
-DATASOURCES: list[bolt.datasources.Datasource] = []
-for ds in bolt.config.metadata.keys():
-    DS = getattr(bolt.datasources, ds, None)
-    if DS and issubclass(DS, bolt.datasources.Datasource):
-        DATASOURCES.append(DS)
 
-# Populate a list of custom Report objects
-REPORTS: list[bolt.reports.BaseReport] = []
-for _obj_name in bolt.reports.__dir__():
-    RPT = getattr(bolt.reports, _obj_name, None)
-    if type(RPT).__name__ in ("str", "module"):
-        continue
-    if not hasattr(RPT, "__name__") or not hasattr(RPT, "__class__"):
-        continue
-    if RPT.__name__ == "BaseReport":
-        continue
-    if issubclass(RPT, bolt.reports.BaseReport):
-        REPORTS.append(RPT)
+def get_datasources():
+    """Generates a list of datasource objects (using the config)."""
+    for ds in bolt.config.metadata.keys():
+        DS = getattr(bolt.datasources, ds, None)
+        if DS and issubclass(DS, bolt.datasources.Datasource):
+            yield DS
 
-# TODO: fix and re-implement
-'''
-@app.command
-def add(datafile: str):
-    """Add data files to tracked data."""
-    # Get a dict of changed files by change type/status
-    changes: dict = tracker.get_changes()
-    # Get a list of all changed files
-    all_changed_files: list[str] = []
-    all_changed_files.extend(changes["new_files"])
-    all_changed_files.extend(changes["modified"])
-    all_changed_files.extend(changes["removed"])
 
-    # Filter changed files by filename, or use "." for all
-    files_to_add: list[str] = [p for p in all_changed_files if fnmatch(p, datafile)]
-    if datafile == ".":
-        files_to_add = all_changed_files.copy()
+def get_reports():
+    """Generates a list of report objects."""
+    for _obj_name in bolt.reports.__dir__():
+        RPT = getattr(bolt.reports, _obj_name, None)
+        if type(RPT).__name__ in ("str", "module"):
+            continue
+        if not hasattr(RPT, "__name__") or not hasattr(RPT, "__class__"):
+            continue
+        if RPT.__name__ == "BaseReport":
+            continue
+        if issubclass(RPT, bolt.reports.BaseReport):
+            yield RPT
 
-    # No changes to update
-    if len(files_to_add) == 0:
-        console.print("\n[green]Nothing to add.[/]")
-        return
 
-    # Pass a list of all filenames to add
-    tracker.commit_changes(files_to_add)
-    for file in files_to_add:
-        console.print(f"        [green]{'added:'.ljust(11)} {file}[/]")
-    return
+def time_diff(start: float, end: float) -> str:
+    """Calculates the minutes and seconds difference between two timestamps (floats)."""
+    delta = dt.timedelta(seconds=(end - start))  # TODO: .total_seconds()
+    min = int(delta.total_seconds() // 60)
+    sec = delta.total_seconds() % 60
+    t_msg = f"{min}:{sec:.2f}"
+    return t_msg
 
 
 @app.command
-def status():
-    changes: dict = tracker.get_changes()
-    console.print(
-        "Changes to data files:"
-    )  # TODO: always prints, even if status is 'No changes'
-    console.print(f'  (use "python {SCRIPT} add <file>..." to register new files)')
+def most_recent(datasource_name: str|None = None):
+    """List the most recent raw file for a dataset (default all).
 
-    # Print changes
-    if changes["new_files"]:
-        status = "new file:"
-        for file in sorted(changes["new_files"]):
-            console.print(f"        [red]{status.ljust(11)} {file}[/]")
+        Example
+        -------
+        `python bolt-cmd.py most-recent`
+        `python bolt-cmd.py most-recent MyDataset`
+    """
+    for k, v in bolt.config.metadata.items():
+        if not v.get("source_dir", False):
+            continue
+        if datasource_name and k != datasource_name:
+            continue
+        files = Path(v["source_dir"]).rglob(v["filename"])
+        ages = [(f.name, f.stat().st_mtime) for f in files]
+        recent: tuple[str, float] = sorted(ages, key=lambda x: x[1], reverse=True)[0]
+        ts = dt.datetime.fromtimestamp(recent[1]).strftime("%Y-%m-%d %I:%M %p")
+        t = dt.datetime.now() - dt.datetime.fromtimestamp(recent[1])
+        stale_after = v.get("stale_after", 20)
+        stale_color = "green"
 
-    if changes["modified"]:
-        status = "modified:"
-        for file in sorted(changes["modified"]):
-            console.print(f"        [red]{status.ljust(11)} {file}[/]")
+        if t.days > 0:
+            age = (t.days, "days")
+            if age[0] >= stale_after - 5:
+                stale_color = "yellow"
+            # WIP:
+            if age[0] > stale_after:
+                stale_color = "red"
+        else:
+            age = (round(t.total_seconds() / 3600, 1), "hours")
 
-    if changes["removed"]:
-        status = "removed:"
-        for file in sorted(changes["removed"]):
-            console.print(f"        [red]{status.ljust(11)} {file}[/]")
-
-    if not any(changes.values()):
-        console.print("\n[green]No changes detected.[/]")
-
+        console.print(f"[cyan]{k}[/]")
+        console.print(f"Filename: '{recent[0]}'")
+        console.print(f"Mod Date: [white]{ts}[/]")
+        console.print(f"Age:      [{stale_color}]{age[0]} {age[1]}[/]")
+        console.print()
     return
-'''
 
 
 @app.command
 def report(
     option: Literal["list", "info", "run"], rpt_name: str = "", *args, **kwargs
-):  # TODO: write: bool = True?
-    """Execute a report by report class name with kwargs.
+):
+    """Execute a report by report class name (with kwargs).
+
     Use `report-info <report name>` for details about a report.
 
         Example
         -------
         `python bolt-cmd.py report run ParatransitNoShows --start=20250101 --end=20250131`
     """
+    # TODO: write: bool = True?
+    # TODO: consider an '--update' flag to update report dependencies
+    # e.g. python bolt-cmd.py report run ParatransitNoShows --update
     # NOTE: list option does not require 'rpt_name'
     if option == "list":
         console.print("Available Reports:")
-        for rpt in REPORTS:
+        #for rpt in REPORTS:
+        for rpt in list(get_reports()):
             console.print(f"        [green]{rpt.__name__}[/]")
         console.print("For more info, use: ")
-        console.print("[b blue]`python bolt-cmd.py report info <report name>`[/]")
+        console.print("[b blue]    `python bolt-cmd.py report info <report name>`[/]\n")
         return
-
-    # TODO: consider an '--update' flag to update report dependencies
-    # e.g. python bolt-cmd.py report run ParatransitNoShows --update
 
     if not rpt_name:
         raise AttributeError("'rpt_name' argument is required")
@@ -139,7 +131,8 @@ def report(
     Rpt = getattr(bolt.reports, rpt_name)  # Get python class by name
     rpt = Rpt()
     if option == "info":
-        console.print(f"[green]{rpt.name}[/]")
+        console.print(f"[white]Report Info:[/]")
+        console.print(f"[green]    {rpt.name}[/]")
         console.print(f"[yellow]{rpt.run.__doc__}[/]")
         return
 
@@ -147,7 +140,6 @@ def report(
         console.print(f"Running report: {rpt_name}...")
         console.print(f"        (args={args})")
         console.print(f"        (kwargs={kwargs})")
-        # console.print("        ...", end="\r")
         try:
             rpt.run(*args, **kwargs)
             if rpt._exported:
@@ -187,6 +179,7 @@ def update(
     download=True,
 ):
     """Updates datasource by name, or all configured datasources ('.').
+
     Alternatively, update only the data warehouse using 'db'.
     Examples:
         `python bolt-cmd.py update .`  # updates everything
@@ -199,7 +192,7 @@ def update(
     datasources: list[bolt.datasources.Datasource] | None = None
     ## All
     if datasource_name == ".":
-        datasources = DATASOURCES
+        datasources = list(get_datasources())
     ## Just the DB
     elif datasource_name.lower() == "db":
         datasources = []
@@ -280,7 +273,10 @@ def update(
         skip_db = True  # Override the skip_db flag
 
     if skip_db:
-        console.print("        [yellow]Skipped[/].")
+        if len(errors) > 0:
+            console.print("        [red]Skipped (errors)[/].")
+        else:
+            console.print("        [yellow]Skipped (ignored)[/].")
     else:
         with console.status("Updating database:"):
             try:
@@ -302,17 +298,18 @@ def update(
     return
 
 
+t_init_end = time.time()
+
 if __name__ == "__main__":
     try:
         # Initial blank line and app info
         console.print(f"\nBoltCMD ([b blue]v{__version__}[/])")
+        t_start = time.time()
         app()
     except Exception:
         console.print_exception()
     finally:
         t_end = time.time()
-        t = dt.timedelta(seconds=t_end - t_start)
-        min = int(t.total_seconds() // 60)
-        sec = t.total_seconds() % 60
-        t_msg = f"{min}:{sec:.2f}"
-        console.print(f"[white](Time: {t_msg})[/]\n")
+        # Time/Speed metrics
+        console.print(f"[white](Init Time: {time_diff(t_init_start, t_init_end)})[/]")
+        console.print(f"[white](Execution Time: {time_diff(t_start, t_end)})[/]\n")
