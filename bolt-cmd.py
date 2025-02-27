@@ -3,7 +3,7 @@ import time
 from pathlib import Path
 from typing import Literal
 
-t_init_start = time.time()
+t_init_start = time.perf_counter_ns()
 
 import cyclopts
 import geopandas as gpd
@@ -12,7 +12,6 @@ import polars as pl
 from rich.console import Console
 
 import bolt
-import bolt.warehouse
 
 __version__ = "0.2.0-dev"
 
@@ -53,12 +52,20 @@ def get_reports():
 
 def time_diff(start: float, end: float) -> str:
     """Calculates the minutes and seconds difference between two timestamps (floats)."""
-    delta = dt.timedelta(seconds=(end - start))  # TODO: .total_seconds()
-    min = int(delta.total_seconds() // 60)
-    sec = delta.total_seconds() % 60
+    ms = (end - start) / 1000
+    tot_secs = dt.timedelta(microseconds=ms).total_seconds()
+    min = int(tot_secs // 60)
+    sec = tot_secs % 60
     t_msg = f"{min}:{sec:.2f}"
     return t_msg
 
+
+@app.command
+def compile():
+    from py_compile import compile
+
+    for mod in ...:
+        compile(mod, "bolt")
 
 @app.command
 def most_recent(datasource_name: str|None = None):
@@ -298,18 +305,18 @@ def update(
     return
 
 
-t_init_end = time.time()
+t_init_end = time.perf_counter_ns()
 
 if __name__ == "__main__":
     try:
         # Initial blank line and app info
         console.print(f"\nBoltCMD ([b blue]v{__version__}[/])")
-        t_start = time.time()
+        t_start = time.perf_counter_ns()
         app()
     except Exception:
         console.print_exception()
     finally:
-        t_end = time.time()
+        t_end = time.perf_counter_ns()
         # Time/Speed metrics
         console.print(f"[white](Init Time: {time_diff(t_init_start, t_init_end)})[/]")
         console.print(f"[white](Execution Time: {time_diff(t_start, t_end)})[/]\n")
