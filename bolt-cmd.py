@@ -67,14 +67,15 @@ def compile():
     for mod in ...:
         compile(mod, "bolt")
 
+
 @app.command
-def most_recent(datasource_name: str|None = None):
+def most_recent(datasource_name: str | None = None):
     """List the most recent raw file for a dataset (default all).
 
-        Example
-        -------
-        `python bolt-cmd.py most-recent`
-        `python bolt-cmd.py most-recent MyDataset`
+    Example
+    -------
+    `python bolt-cmd.py most-recent`
+    `python bolt-cmd.py most-recent MyDataset`
     """
     for k, v in bolt.config.metadata.items():
         if not v.get("source_dir", False):
@@ -108,9 +109,7 @@ def most_recent(datasource_name: str|None = None):
 
 
 @app.command
-def report(
-    option: Literal["list", "info", "run"], rpt_name: str = "", *args, **kwargs
-):
+def report(option: Literal["list", "info", "run"], rpt_name: str = "", *args, **kwargs):
     """Execute a report by report class name (with kwargs).
 
     Use `report-info <report name>` for details about a report.
@@ -125,7 +124,7 @@ def report(
     # NOTE: list option does not require 'rpt_name'
     if option == "list":
         console.print("Available Reports:")
-        #for rpt in REPORTS:
+        # for rpt in REPORTS:
         for rpt in list(get_reports()):
             console.print(f"        [green]{rpt.__name__}[/]")
         console.print("For more info, use: ")
@@ -138,7 +137,7 @@ def report(
     Rpt = getattr(bolt.reports, rpt_name)  # Get python class by name
     rpt = Rpt()
     if option == "info":
-        console.print(f"[white]Report Info:[/]")
+        console.print("[white]Report Info:[/]")
         console.print(f"[green]    {rpt.name}[/]")
         console.print(f"[yellow]{rpt.run.__doc__}[/]")
         return

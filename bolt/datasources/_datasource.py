@@ -111,7 +111,9 @@ class Datasource[T](ABC):
             raise AttributeError(f"Datasource `{self.name}` has no source files")
         ext = self.metadata["filename"].split(".")[-1].lower()
         if ext == "txt":
-            kwargs["separator"] = "\t" # TODO: config.metadata[self.name].get("seperator", ",")
+            kwargs["separator"] = (
+                "\t"  # TODO: config.metadata[self.name].get("seperator", ",")
+            )
         if self.metadata.get("load_with_geopandas", False):
             # TODO: would we ever read multiple?
             layer = self.metadata.get("layer", 0)
@@ -122,7 +124,8 @@ class Datasource[T](ABC):
             scan_func = SCANNERS.get(ext, None)
             if self.lazy_load_raw and scan_func:
                 self.raw = [
-                    (p, scan_func(p, ignore_errors=True, **kwargs)) for p in self.source_files
+                    (p, scan_func(p, ignore_errors=True, **kwargs))
+                    for p in self.source_files
                 ]
             else:
                 self.raw = [
@@ -130,9 +133,9 @@ class Datasource[T](ABC):
                         p,
                         read_func(
                             p,
-                            #schema_overrides=self.schema_overrides,
-                            #infer_schema_length=10000,
-                            **kwargs
+                            # schema_overrides=self.schema_overrides,
+                            # infer_schema_length=10000,
+                            **kwargs,
                         ),
                     )
                     for p in self.source_files

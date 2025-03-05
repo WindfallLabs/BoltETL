@@ -1,7 +1,9 @@
 """Sort SQL file dependencies."""
+
 import re
-from graphlib import TopologicalSorter
 from pathlib import Path
+
+from graphlib import TopologicalSorter
 
 sql_dir = Path(r"C:\Workspace\tmpdb\Data\__bolt__\sql")  # TODO: use config
 sql_files = list(sql_dir.glob("*.sql"))
@@ -19,10 +21,7 @@ def parse_sql_file(file: Path):
     sql = re.sub(r"^\s*--.*$", "", sql, flags=re.MULTILINE)
     return (
         fname,
-        {
-            dep for dep in regex.findall(sql)
-            if dep.lower() not in fname.lower()
-        }
+        {dep for dep in regex.findall(sql) if dep.lower() not in fname.lower()},
     )
 
 
@@ -31,7 +30,8 @@ def get_sql_file_dependencies():
     d = dict(map(parse_sql_file, sql_files))
     dependents = TopologicalSorter(d).static_order()
     dependent_files = tuple(
-        f"{i.lower()}.sql" for i in dependents
+        f"{i.lower()}.sql"
+        for i in dependents
         if sql_dir.joinpath(f"{i.lower()}.sql").exists()
     )
     return dependent_files
