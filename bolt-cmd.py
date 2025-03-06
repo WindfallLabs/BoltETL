@@ -13,7 +13,7 @@ from rich.console import Console
 
 import bolt
 
-__version__ = "0.2.0-dev"
+__version__ = bolt.__version__
 
 console = Console()
 app = cyclopts.App()
