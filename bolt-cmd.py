@@ -26,28 +26,8 @@ logo = """┏━━┓━━━━━┏┓━━┏┓━┏━━━┓┏━�
 ┗━━━┛┗━━┛┗━┛━┗━┛┗━━━┛━┗━━┛━┗━━━┛"""
 
 SCRIPT = Path(__file__).name
-
-
-def get_datasources():
-    """Generates a list of datasource objects (using the config)."""
-    for ds in bolt.config.metadata.keys():
-        DS = getattr(bolt.datasources, ds, None)
-        if DS and issubclass(DS, bolt.datasources.Datasource):
-            yield DS
-
-
-def get_reports():
-    """Generates a list of report objects."""
-    for _obj_name in bolt.reports.__dir__():
-        RPT = getattr(bolt.reports, _obj_name, None)
-        if type(RPT).__name__ in ("str", "module"):
-            continue
-        if not hasattr(RPT, "__name__") or not hasattr(RPT, "__class__"):
-            continue
-        if RPT.__name__ == "BaseReport":
-            continue
-        if issubclass(RPT, bolt.reports.BaseReport):
-            yield RPT
+DATASOURCES: dict[str, bolt.Datasource] = bolt.Datasource.registry
+REPORTS: dict[str, bolt.Report] = bolt.Report.registry
 
 
 def time_diff(start: float, end: float) -> str:
@@ -61,14 +41,6 @@ def time_diff(start: float, end: float) -> str:
 
 
 @app.command
-def compile():
-    from py_compile import compile
-
-    for mod in ...:
-        compile(mod, "bolt")
-
-
-@app.command
 def most_recent(datasource_name: str | None = None):
     """List the most recent raw file for a dataset (default all).
 
@@ -77,17 +49,14 @@ def most_recent(datasource_name: str | None = None):
     `python bolt-cmd.py most-recent`
     `python bolt-cmd.py most-recent MyDataset`
     """
-    for k, v in bolt.config.metadata.items():
-        if not v.get("source_dir", False):
-            continue
-        if datasource_name and k != datasource_name:
-            continue
-        files = Path(v["source_dir"]).rglob(v["filename"])
+    for datasource_name, datasource in DATASOURCES.items():
+        files = datasource.source_files
         ages = [(f.name, f.stat().st_mtime) for f in files]
         recent: tuple[str, float] = sorted(ages, key=lambda x: x[1], reverse=True)[0]
         ts = dt.datetime.fromtimestamp(recent[1]).strftime("%Y-%m-%d %I:%M %p")
         t = dt.datetime.now() - dt.datetime.fromtimestamp(recent[1])
-        stale_after = v.get("stale_after", 20)
+        #stale_after = v.get("stale_after", 20)
+        stale_after = 20  # TODO:
         stale_color = "green"
 
         if t.days > 0:
@@ -100,7 +69,7 @@ def most_recent(datasource_name: str | None = None):
         else:
             age = (round(t.total_seconds() / 3600, 1), "hours")
 
-        console.print(f"[cyan]{k}[/]")
+        console.print(f"[cyan]{datasource_name}[/]")
         console.print(f"Filename: '{recent[0]}'")
         console.print(f"Mod Date: [white]{ts}[/]")
         console.print(f"Age:      [{stale_color}]{age[0]} {age[1]}[/]")
@@ -124,9 +93,8 @@ def report(option: Literal["list", "info", "run"], rpt_name: str = "", *args, **
     # NOTE: list option does not require 'rpt_name'
     if option == "list":
         console.print("Available Reports:")
-        # for rpt in REPORTS:
-        for rpt in list(get_reports()):
-            console.print(f"        [green]{rpt.__name__}[/]")
+        for rpt in REPORTS.values():
+            console.print(f"        [green]{rpt.name}[/]")
         console.print("For more info, use: ")
         console.print("[b blue]    `python bolt-cmd.py report info <report name>`[/]\n")
         return
@@ -134,8 +102,7 @@ def report(option: Literal["list", "info", "run"], rpt_name: str = "", *args, **
     if not rpt_name:
         raise AttributeError("'rpt_name' argument is required")
 
-    Rpt = getattr(bolt.reports, rpt_name)  # Get python class by name
-    rpt = Rpt()
+    rpt = REPORTS[rpt_name]
     if option == "info":
         console.print("[white]Report Info:[/]")
         console.print(f"[green]    {rpt.name}[/]")
@@ -143,12 +110,12 @@ def report(option: Literal["list", "info", "run"], rpt_name: str = "", *args, **
         return
 
     if option == "run":
-        console.print(f"Running report: {rpt_name}...")
+        console.print(f"Running report: {rpt.name}...")
         console.print(f"        (args={args})")
         console.print(f"        (kwargs={kwargs})")
         try:
             rpt.run(*args, **kwargs)
-            if rpt._exported:
+            if getattr(rpt, "_exported", False):
                 console.print(f"        Exported results to '{rpt.out_path}'")
         except Exception as e:
             console.print(f"        [red]Failed: {e}")
@@ -198,13 +165,15 @@ def update(
     datasources: list[bolt.datasources.Datasource] | None = None
     ## All
     if datasource_name == ".":
-        datasources = list(get_datasources())
+        #datasources = list(get_datasources())
+        datasources = list(DATASOURCES.values())
     ## Just the DB
     elif datasource_name.lower() == "db":
         datasources = []
     ## Just the specified one
     else:
-        datasources = [getattr(bolt.datasources, datasource_name)]
+        #datasources = [getattr(bolt.datasources, datasource_name)]
+        datasources = [DATASOURCES[datasource_name]]
 
     # Database
     db = bolt.warehouse.connect()
@@ -223,16 +192,18 @@ def update(
             update_msg = "Updating datasources (force=True):"
         console.print(update_msg)
 
-        for D in datasources:
+        #for D in datasources:
+        for d in datasources:
             try:
-                d = D()
+                #d = D()
                 if d.name in ignore:
                     console.print(f"        [yellow]Skipped: {d.name} (ignored)[/]")
                     continue
                 db = bolt.warehouse.connect()
 
                 ## Hash (sha256) the source files
-                current_hash = bolt.warehouse.hash_sources(d)
+                #current_hash = bolt.warehouse.hash_sources(d)  # TODO: replace (below)
+                current_hash = d.metadata.hash_sources()
                 if not force:
                     # Ignore update for datasources with no changes to the source files
                     ## Get the last hash (sha256) of the source files
@@ -249,7 +220,10 @@ def update(
                         )
                         continue
                 with console.status(f"[cyan]      Updating {d.name}...[/]"):
-                    df = d.update(download)  # noqa: F841
+                    #df = d.update(download)  # noqa: F841
+                    # TODO: reinstate download
+                    df = d.update()
+                    # TODO: d.load(db) -- to remove much of this logic
                     # Write to database
                     if isinstance(df, gpd.GeoDataFrame):
                         db.sql(

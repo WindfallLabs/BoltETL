@@ -1,24 +1,23 @@
 """Functions for the DuckDB Warehouse."""
 
-from hashlib import sha256
+import os
 from pathlib import Path
 
 import duckdb
 import polars as pl
 import xlsxwriter
 
-from bolt.datasources import Datasource
 from bolt.utils import config, funcs
-from bolt.utils.servicedays import CalendarDim  # TODO: watch for changes here
+from bolt.utils.servicedays import CalendarDim  # TODO: remove business logic from Bolt
 
-DB_PATH = config.data_dir.joinpath(config.db_name)
+DB_PATH = Path(os.environ["BOLT-DATA"]) / "warehouse.duckdb"
 
 SQL_FUNCS = [
     funcs.fiscal_year,
 ]
 
 SQL_FILES: list[Path] = [
-    config.definitions_dir.joinpath("sql").joinpath(sql_file)
+    Path(os.environ["BOLT-DATA"]) / "sql" / sql_file
     for sql_file in config.dependencies["sql"]
 ]
 
@@ -98,23 +97,6 @@ def create_schemas():
             )  # raises panic error if polars.DataFrame
     db.close()
     return
-
-
-def hash_sources(ds: Datasource):
-    """Gets a hash of the source files."""
-    hashes = []
-    try:
-        for p in ds.source_files:
-            p: Path = Path(p)
-            if p.is_dir():
-                # raise AttributeError("TODO: Hash cannot be performed on folder")
-                continue
-            with p.open("rb") as f:
-                hashes.append(sha256(f.read()).hexdigest())
-    except Exception:
-        raise AttributeError(f"TODO: Hash cannot be performed on {ds.name}")
-    current_hash = sha256("".join(hashes).encode("UTF8")).hexdigest()[:7]
-    return current_hash
 
 
 def update_sql(compact_db=False) -> tuple[int, str]:

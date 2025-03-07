@@ -1,12 +1,73 @@
 """Base Report Class."""
 
-from abc import ABC, abstractmethod
+from functools import wraps
+from logging import Logger
+from typing import Any, Callable
 
-import pandas as pd
+from ._options import Options
+from bolt.utils import make_logger, IOLogger
 
-from bolt.utils import config, make_logger
 
+class Report[T]:
+    registry: dict[str, T] = dict()
 
+    def __init__(
+        self,
+        name: str,
+        #output_path: str|Path|None = None,
+        options: Options|None = None
+    ):
+        """."""
+        self._name = name
+        #self.output_path = output_path
+        self.options = options if options else Options()
+
+        # Data
+        self._data: dict[str, Any] = dict()
+
+        # Logging setup
+        self.logger: Logger|IOLogger = make_logger(self._name, self.options.log_dir)
+
+        # Processing attributes
+        self.run: Callable|None = None
+
+        # Register report
+        if self.options.register:
+            self.registry[self._name] = self
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def data(self):
+        return self._data
+
+    # ========================================================================
+    # Wrapper methods
+    def run_wrapper(self, func: Callable) -> Callable:
+        """
+        Decorator to register the class's `extract` method.
+
+        The function that this decorator wraps must have the following arguments:
+
+        Args:
+            source_files (list[Path]): A list of Path objects for each raw data file
+            logger (logging.Logger|NullLogger): optionally log messages to file
+
+        Returns:
+            raw_data (Any): Extracted data (probably a DataFrame)
+        """
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            self._data.update(func(*args, **kwargs))
+            return
+        self.run = wrapper
+        return wrapper
+
+    # TODO: consider a @sheet for excel sheets
+
+'''
 class BaseReport(ABC):
     def __init__(self):
         self.name = self.__class__.__name__
@@ -55,3 +116,4 @@ class BaseReport(ABC):
 
     @abstractmethod
     def run(self): ...
+'''
