@@ -1,16 +1,15 @@
 """Datasource ABC."""
 
+import json
 from dataclasses import dataclass, field
 from functools import wraps
-#from getpass import getuser
 from hashlib import sha256
 from logging import Logger
 from pathlib import Path
-#from platform import node
 from typing import Any, Callable, Optional, List, Tuple
 
 from ._options import Options
-from bolt.utils import config, make_logger, IOLogger
+from bolt.utils import make_logger, IOLogger
 
 
 '''
@@ -76,6 +75,12 @@ class Metadata:
             raise AttributeError(f"TODO: Hash cannot be performed on {self.datasource.name}")
         self.sources_hash = sha256("".join(hashes).encode("UTF8")).hexdigest()[:7]
         return self.sources_hash
+
+    def to_json(self):
+        string_dict = {}
+        for k, v in self.__dict__.items():
+            string_dict[str(k)] = str(v)
+        return json.dumps(string_dict, indent=4)
 
 
 class Datasource[T]:
@@ -179,12 +184,12 @@ class Datasource[T]:
             raw_data (Any): Extracted data (probably a DataFrame)
         """
         @wraps(func)
-        def wrapper(*args, **kwargs):
-            #self._raw_data = func(self.source_files, self.metadata, self.options, self.logger)
+        def _extract_wrapper(*args, **kwargs):
             self._raw_data = func(self)
+            self.logger.info(f"Extracted (len={len(self._raw_data)})")
             return
-        self.extract = wrapper
-        return wrapper
+        self.extract = _extract_wrapper
+        return
 
     def transform_wrapper(self, func: Callable) -> Callable:
         """
@@ -201,12 +206,12 @@ class Datasource[T]:
             data (Any): Processed data (probably a DataFrame)
         """
         @wraps(func)
-        def wrapper(*args, **kwargs):
-            #self._data = func(self.raw_data, self.metadata, self.options, self.logger)
+        def _transform_wrapper(*args, **kwargs):
             self._data = func(self)
+            self.logger.info(f"Transformed (len={len(self._data)})")
             return
-        self.transform = wrapper
-        return wrapper
+        self.transform = _transform_wrapper
+        return
 
     def load_wrapper(self, func: Callable) -> Callable:  # TODO:
         """
@@ -223,11 +228,11 @@ class Datasource[T]:
             None
         """
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def _load_wrapper(*args, **kwargs):
             self.load = func(self)  # TODO:
             return
-        self.load = wrapper
-        return wrapper
+        self.load = _load_wrapper
+        return
 
     def cache_wrapper(self, func: Callable) -> Callable:
         """
@@ -242,11 +247,11 @@ class Datasource[T]:
             Callable: Decorated function
         """
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def _cache_wrapper(*args, **kwargs):
             func(self)
             return
-        self.cache = wrapper
-        return wrapper
+        self.cache = _cache_wrapper
+        return
 
 
     def validate_wrapper(self, func: Callable) -> Callable:
@@ -262,13 +267,11 @@ class Datasource[T]:
             Callable: Decorated function
         """
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def _validate_wrapper(*args, **kwargs):
             func(self)  # Execute the validation function
             return
-        self.cache = wrapper
-        return wrapper
-
-
+        self.cache = _validate_wrapper
+        return
 
     # ========================================================================
     # Update method
@@ -283,7 +286,9 @@ class Datasource[T]:
             ValueError: If extract function is not defined
             ValidationError: If any validation fails
         """
-        self.logger.info(f"Starting update for datasource: {self._name}")
+        self.logger.info(f"Starting update for {self._name}")
+        self.logger.debug(f"Metadata:\n{self.metadata.to_json()}")
+        self.logger.debug(f"Options:\n{self.options.to_json()}")
         TEST_FLAG = False  # TODO: remove when bolt-cmd no longer handles this
 
         # Check that `extract` method is set
@@ -300,13 +305,13 @@ class Datasource[T]:
 
         # Extract data
         self.logger.info(
-            f"Extracting data from {len(self.source_files)} file(s) in {self.source_dir}"
+            f"Extracting data from {len(self.source_files)} file(s) in '{self.source_dir}'"
         )
         self.extract()
 
         # Transform data if `transform` function was defined
         if self.transform:
-            self.logger.info("Applying transformation")
+            self.logger.info("Applying transformation(s)")
             self.transform()
         else:
             self.logger.warning("No extract function defined")
@@ -333,7 +338,7 @@ class Datasource[T]:
             self.load()
 
 
-        self.logger.info("Update completed successfully")
+        self.logger.info("Update completed")
         return self._data
 
     def __repr__(self):

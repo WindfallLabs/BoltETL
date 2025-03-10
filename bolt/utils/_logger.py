@@ -1,7 +1,13 @@
 """Logging utilities."""
 import logging
+#from getpass import getuser
 from io import StringIO
 from pathlib import Path
+#from platform import node
+
+#USER = f"{node()}/{getuser()}"
+#DEFAULT_FORMAT = "[{asctime} | " + USER + "] [{name}/{filename}:{funcName}/{levelname}]: {message}"
+DEFAULT_FORMAT = "[{asctime}] [{levelname}/{name}/{filename}:{funcName}]: {message}"
 
 
 class IOLogRecord(logging.LogRecord):
@@ -16,9 +22,7 @@ class IOLogger(logging.Logger):
     def __init__(self, name: str, formatter: logging.Formatter, level=logging.DEBUG):
         super().__init__(name, level)
         self.log = StringIO()
-        self.formatter = formatter or logging.Formatter(
-            "[{asctime}] [{name}/{levelname}]: {message}", style="{"
-        )
+        self.formatter = formatter
 
     def makeRecord(self, name, level, fn, lno, msg, args, exc_info,
                    func=None, extra=None, sinfo=None):
@@ -78,7 +82,7 @@ def make_logger(
 ) -> logging.Logger:
     # Default format
     if format is None:
-        format = "[{asctime}] [{funcName}/{name}/{levelname}]: {message}"
+        format = DEFAULT_FORMAT
     formatter = logging.Formatter(format, style="{")
     if log_dir is None:
         return IOLogger(name, formatter)

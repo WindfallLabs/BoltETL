@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -22,10 +23,16 @@ class Options:
     log_dir: Path|None = None
     log_format: str|None = None
     cache_path: Path|None = None
-    register: bool = True,
+    register: bool = True
     # TODO: more?
     kwargs: field(default_factory=dict) = None  # type: ignore
 
     def __post_init__(self):
         if self.kwargs:
             [setattr(self, k, v) for k, v in self.kwargs.items()]
+
+    def to_json(self):
+        string_dict = {}
+        for k, v in self.__dict__.items():
+            string_dict[str(k)] = str(v)
+        return json.dumps(string_dict, indent=4)

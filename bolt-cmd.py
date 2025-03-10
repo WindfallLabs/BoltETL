@@ -1,6 +1,8 @@
 import datetime as dt
 import time
+from getpass import getuser
 from pathlib import Path
+from platform import node
 from typing import Literal
 
 t_init_start = time.perf_counter_ns()
@@ -28,6 +30,7 @@ logo = """┏━━┓━━━━━┏┓━━┏┓━┏━━━┓┏━�
 SCRIPT = Path(__file__).name
 DATASOURCES: dict[str, bolt.Datasource] = bolt.Datasource.registry
 REPORTS: dict[str, bolt.Report] = bolt.Report.registry
+USER = f"{node()}/{getuser()}"
 
 
 def time_diff(start: float, end: float) -> str:
@@ -197,14 +200,20 @@ def update(
 
         #for D in datasources:
         for d in datasources:
+            d.logger.info("============== Bolt-CMD ==============")
+            d.logger.info(f"Start ({d.name})")
+            d.logger.info(f"Args: `--force={force} --download={download}`")
+            d.logger.info(f"Executed by {USER}")
             try:
                 if d.name in ignore:
                     console.print(f"        [yellow]Skipped: {d.name} (ignored)[/]")
+                    d.logger.info("Ignored (explicitly by user)")
                     continue
                 db = bolt.warehouse.connect()
 
                 ## Hash (sha256) the source files
                 #current_hash = bolt.warehouse.hash_sources(d)  # TODO: replace (below)
+                d.logger.info("Calculating hash")
                 current_hash = d.metadata.hash_sources()
                 if not force:
                     # Ignore update for datasources with no changes to the source files
@@ -220,9 +229,11 @@ def update(
                         console.print(
                             f"        [yellow]Skipped: {d.name} (unchanged)[/]"
                         )
+                        d.logger.info(f"Update skipped (source files unchanged; {d.metadata.sources_hash})")
                         continue
                 with console.status(f"[cyan]      Updating {d.name}...[/]"):
-                    # TODO: reinstate download
+                    d.logger.info("Calling update command")
+                    # TODO: reinstate download option
                     df = d.update()  # noqa: F841
                     # TODO: d.load(db) -- to remove much of this logic
                     # Write to database
@@ -239,13 +250,17 @@ def update(
                         f"INSERT OR REPLACE INTO data_updates VALUES ('{d.name}', '{dt.date.today()}', '{current_hash}')"
                     )
                     console.print(f"        [green]Updated: {d.name}[/]")
+                    d.logger.info("Update complete")
             except Exception as e:
+                d.logger.critical(f"{e}")
                 errors.append((d.name, e))
                 console.print(f"        [red]Failed: {d.name}[/]")
                 if not ignore_errors:
                     raise e
             finally:
                 db.close()
+                d.logger.info(f"End")
+                #d.logger.info("======================================")
         console.print(f"    Tables Loaded: {tables_loaded}")
 
     # Update database
