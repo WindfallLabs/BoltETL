@@ -151,6 +151,11 @@ class Datasource[T]:
         """Getter for processed dataframe"""
         return self._data
 
+    def set_data(self, data: Any) -> None:
+        """Allows users to manually set the data attribute from anywhere."""
+        self._data = data
+        return
+
     # ========================================================================
     # Wrapper methods
     def extract_wrapper(self, func: Callable) -> Callable:
@@ -168,7 +173,8 @@ class Datasource[T]:
         """
         @wraps(func)
         def wrapper(*args, **kwargs):
-            self._raw_data = func(self.source_files, self.metadata, self.options, self.logger)
+            #self._raw_data = func(self.source_files, self.metadata, self.options, self.logger)
+            self._raw_data = func(self)
             return
         self.extract = wrapper
         return wrapper
@@ -189,7 +195,8 @@ class Datasource[T]:
         """
         @wraps(func)
         def wrapper(*args, **kwargs):
-            self._data = func(self.raw_data, self.metadata, self.options, self.logger)
+            #self._data = func(self.raw_data, self.metadata, self.options, self.logger)
+            self._data = func(self)
             return
         self.transform = wrapper
         return wrapper
@@ -210,7 +217,7 @@ class Datasource[T]:
         """
         @wraps(func)
         def wrapper(*args, **kwargs):
-            self.load = func(self.raw, self.metadata, self.options, self.logger)  # TODO:
+            self.load = func(self)  # TODO:
             return
         self.load = wrapper
         return wrapper
@@ -330,7 +337,7 @@ class Datasource[T]:
         self.logger.info(f"Starting update for datasource: {self._name}")
 
         if not self.extract:
-            error_msg = "No extract function defined"
+            error_msg = f"{self.name} is missing `extract` function"
             self.logger.error(error_msg)
             raise ValueError(error_msg)
 
@@ -341,15 +348,14 @@ class Datasource[T]:
         # Run validations
         #self._run_validations(self._data)  # TODO: move
 
-        # Transform data if transform function exists
-        if not self.transform:
-            error_msg = "No extract function defined"
-            self.logger.error(error_msg)
-            raise ValueError(error_msg)
+        # Transform data if `transform` function was defined
+        if self.transform:
+            self.logger.info("Applying transformation")
+            self.transform()
+        else:
+            self.logger.warning("No extract function defined")
 
-        self.logger.info("Applying transformation")
-        self.transform()
-
+        # Cache (staging) if `cache` function was defined
         if self.cache and self.options.cache_dir:
             self.cache(self.options.cache_dir)
 
