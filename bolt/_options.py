@@ -10,6 +10,9 @@ class Options:
     Args:
         log_dir (Path): The Path/directory of the output log
             (The presence/absence of this value enables/disables logging)
+        log_format (str): The format used in logging (default None; uses default format)
+        cache_path (Path): Path where transformed data will be saved to disk
+            (only when a user-defined `cache` function uses it)
         register (bool): Whether or not to add to datasources registry
             (False disables the datasource from use in BoltETL tools)
         ...
@@ -17,6 +20,8 @@ class Options:
 
     """
     log_dir: Path|None = None
+    log_format: str|None = None
+    cache_path: Path|None = None
     register: bool = True,
     # TODO: more?
     kwargs: field(default_factory=dict) = None  # type: ignore

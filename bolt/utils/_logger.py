@@ -1,10 +1,7 @@
+"""Logging utilities."""
 import logging
 from io import StringIO
 from pathlib import Path
-
-FORMATTER = logging.Formatter(
-    "[{asctime}] [{name}/{levelname}]: {message}", style="{"
-)
 
 
 class IOLogRecord(logging.LogRecord):
@@ -72,21 +69,19 @@ class IOLogger(logging.Logger):
         self.log.write(self.formatter.format(record) + "\n")
         return
 
-'''
-# Usage example
-iologger = IOLogger("my_logger", FORMATTER)
-iologger.debug("This is a debug message.")
-iologger.info("This is an info message.")
-iologger.warning("This is a warning message.")
-iologger.error("This is an error message.")
-iologger.critical("This is a critical message.")
-print(iologger.log.getvalue())
-'''
 
-
-def make_logger(name: str, log_dir: Path|None, level=logging.DEBUG):
+def make_logger(
+        name: str,
+        log_dir: Path|None,
+        format=None,
+        level=logging.DEBUG
+) -> logging.Logger:
+    # Default format
+    if format is None:
+        format = "[{asctime}] [{funcName}/{name}/{levelname}]: {message}"
+    formatter = logging.Formatter(format, style="{")
     if log_dir is None:
-        return IOLogger(name, FORMATTER)
+        return IOLogger(name, formatter)
 
     logger = logging.getLogger(name)
     logger.setLevel(level)
@@ -94,7 +89,7 @@ def make_logger(name: str, log_dir: Path|None, level=logging.DEBUG):
     # Add file handler
     log_file = log_dir.joinpath(f"{name}.log")
     file_handler = logging.FileHandler(log_file)
-    file_handler.setFormatter(FORMATTER)
+    file_handler.setFormatter(formatter)
     file_handler.setLevel(level)
     logger.addHandler(file_handler)
     return logger

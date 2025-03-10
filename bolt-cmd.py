@@ -165,7 +165,6 @@ def update(
     datasources: list[bolt.datasources.Datasource] | None = None
     ## All
     if datasource_name == ".":
-        #datasources = list(get_datasources())
         datasources = list(DATASOURCES.values())
     ## Just the DB
     elif datasource_name.lower() == "db":
@@ -184,6 +183,10 @@ def update(
 
     # A list of errors to print
     errors: list[tuple[str, Exception]] = []
+    # Report datasource loading failures
+    for failure in bolt.Datasource.failed_to_load:
+        errors.append(failure)
+
     # Process datasources
     if datasources:
         tables_loaded = 0
@@ -195,7 +198,6 @@ def update(
         #for D in datasources:
         for d in datasources:
             try:
-                #d = D()
                 if d.name in ignore:
                     console.print(f"        [yellow]Skipped: {d.name} (ignored)[/]")
                     continue
@@ -220,14 +222,13 @@ def update(
                         )
                         continue
                 with console.status(f"[cyan]      Updating {d.name}...[/]"):
-                    #df = d.update(download)  # noqa: F841
                     # TODO: reinstate download
-                    df = d.update()
+                    df = d.update()  # noqa: F841
                     # TODO: d.load(db) -- to remove much of this logic
                     # Write to database
                     if isinstance(df, gpd.GeoDataFrame):
                         db.sql(
-                            f"CREATE OR REPLACE TABLE {d.name} AS SELECT * FROM st_read('{d.cache_path}');"
+                            f"CREATE OR REPLACE TABLE {d.name} AS SELECT * FROM st_read('{d.options.cache_path}');"
                         )
                         tables_loaded += 1
                     elif isinstance(df, (pl.DataFrame, pd.DataFrame)):
@@ -252,11 +253,11 @@ def update(
     if len(errors) > 0 and not ignore_errors:
         skip_db = True  # Override the skip_db flag
 
-    if skip_db:
+    if skip_db:  # Set if errors
         if len(errors) > 0:
-            console.print("        [red]Skipped (errors)[/].")
+            console.print("        [red]Skipped (errors)[/]")
         else:
-            console.print("        [yellow]Skipped (ignored)[/].")
+            console.print("        [yellow]Skipped (ignored)[/]")
     else:
         with console.status("Updating database:"):
             try:

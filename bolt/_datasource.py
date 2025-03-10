@@ -81,6 +81,7 @@ class Metadata:
 class Datasource[T]:
     """."""
     registry: dict[str, T] = dict()
+    failed_to_load: set[tuple[str, Exception]] = set()
 
     def __init__(
         self,
@@ -109,7 +110,11 @@ class Datasource[T]:
         # TODO: hash the stack of raw data?
 
         # Logging setup
-        self.logger: Logger|IOLogger = make_logger(self._name, self.options.log_dir)
+        self.logger: Logger|IOLogger = make_logger(
+            self._name,
+            self.options.log_dir,
+            self.options.log_format
+        )
 
         # Validation-specific attributes
         self._validation_funcs: List[Tuple[int, str, Callable]] = []
@@ -122,6 +127,8 @@ class Datasource[T]:
         self.extract: Optional[Callable] = None
         self.transform: Optional[Callable] = None
         self.cache: Optional[Callable] = None
+        self.validate: Optional[Callable] = None
+        self.load: Optional[Callable] = None
 
         # Register datasource
         if self.options.register:
@@ -236,90 +243,32 @@ class Datasource[T]:
         """
         @wraps(func)
         def wrapper(*args, **kwargs):
-            #self._data = func(???, self.metadata, self.options, self.logger)  # TODO: args
+            func(self)
             return
         self.cache = wrapper
         return wrapper
 
-    '''
-    def validates(
-        self,
-        name: str = "unnamed_validation",
-        priority: int = 0
-    ):
+
+    def validate_wrapper(self, func: Callable) -> Callable:
         """
-        Decorator to add validation functions with logger access.
+        Decorator to register the class's `validate` method.
+
+        The function that this decorator wraps must have the following arguments:
 
         Args:
-            name (str): Name of the validation
-            priority (int): Priority of the validation
-                            (lower numbers run first, default is 0)
+            arg (type): Desc
 
         Returns:
-            Callable: Decorator function
+            Callable: Decorated function
         """
-        def decorator(func):
-            """
-            Wrap the validation function to provide logger.
-
-            Args:
-                func (Callable): Validation function
-
-            Returns:
-                Callable: Wrapped validation function
-            """
-            @wraps(func)
-            def wrapper(df):
-                # Call original function with logger
-                return func(df, self.logger)
-
-            # Store wrapped function
-            self._validation_funcs.append((priority, name, wrapper))
-
-            # Sort validations by priority
-            self._validation_funcs.sort(key=lambda x: x[0])  # TODO: reverse?
-
-            return wrapper
-        return decorator
-    '''
-
-    '''
-    def _run_validations(self, df: Any):
-        """
-        Run all registered validation functions.
-
-        Args:
-            df (DataFrame): Dataframe to validate
-
-        Raises:
-            ValidationError: If any validation fails
-        """
-        self.logger.info(f"Starting validations for {self._name}")
-
-        if not self._validation_funcs:
-            self.logger.warning("No validations defined")
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            func(self)  # Execute the validation function
             return
+        self.cache = wrapper
+        return wrapper
 
-        for priority, name, validation_func in self._validation_funcs:
-            try:
-                self.logger.info(f"Running validation: {name} (priority: {priority})")
 
-                if not validation_func(df):
-                    error_msg = f"Validation '{name}' failed"
-                    self.logger.error(error_msg)
-                    raise ValidationError(error_msg, name)
-
-                self.logger.info(f"Validation '{name}' passed")
-
-            except Exception as e:
-                self.logger.error(f"Validation '{name}' failed: {str(e)}")
-                raise ValidationError(
-                    f"Validation '{name}' encountered an error: {str(e)}",
-                    name
-                )
-
-        self.logger.info("All validations completed successfully")
-    '''
 
     # ========================================================================
     # Update method
@@ -335,18 +284,25 @@ class Datasource[T]:
             ValidationError: If any validation fails
         """
         self.logger.info(f"Starting update for datasource: {self._name}")
+        TEST_FLAG = False  # TODO: remove when bolt-cmd no longer handles this
 
+        # Check that `extract` method is set
         if not self.extract:
-            error_msg = f"{self.name} is missing `extract` function"
-            self.logger.error(error_msg)
-            raise ValueError(error_msg)
+            extract_error_msg = f"Datasources require an `extract` function"
+            self.logger.critical(extract_error_msg)
+            raise ValueError(extract_error_msg)
+
+        # Check that `load` method is set
+        if not self.load and TEST_FLAG:
+            load_error_msg = f"Datasources require a `load` function"
+            self.logger.critical(load_error_msg)
+            raise ValueError(load_error_msg)
 
         # Extract data
-        self.logger.info(f"Extracting data from {self.source_dir}")
+        self.logger.info(
+            f"Extracting data from {len(self.source_files)} file(s) in {self.source_dir}"
+        )
         self.extract()
-
-        # Run validations
-        #self._run_validations(self._data)  # TODO: move
 
         # Transform data if `transform` function was defined
         if self.transform:
@@ -355,37 +311,30 @@ class Datasource[T]:
         else:
             self.logger.warning("No extract function defined")
 
-        # Cache (staging) if `cache` function was defined
-        if self.cache and self.options.cache_dir:
-            self.cache(self.options.cache_dir)
+        # Cache transformed data to disk (staging)
+        if self.cache is None and self.options.cache_path:
+            self.logger.warning(f"No `cache` function specified; but `options.cache_path` was: '{self.options.cache_path}'")
+        elif self.cache and self.options.cache_path is None:
+            self.logger.warning(f"`cache` function specified, but no value set to `options.cache_path`")
+        elif self.cache and self.options.cache_path:
+            self.logger.info(f"Caching data to '{self.options.cache_path}'")
+            self.cache()
+            # Else, no caching
+
+        # TODO: validation
+        if self.validate:
+            self.logger.info("Validating data")
+            self.validate()
+
+        # Execute the load function (must exist)
+        TEST_FLAG = False  # TODO: remove when bolt-cmd no longer handles this
+        if not self.load and TEST_FLAG:
+            self.logger.info("Loading data")
+            self.load()
+
 
         self.logger.info("Update completed successfully")
-
-        # TODO: more...
-        # TODO: self.load()
         return self._data
-
-    '''
-    def save(self, path: Optional[str] = None):
-        """
-        Save the processed dataframe to a specified path.
-
-        Args:
-            path (Optional[str]): Path to save the dataframe.
-                                  If None, uses a default naming convention.
-        """
-        if self._data is None:
-            error_msg = "No dataframe to save. Run update() first."
-            self._logger.error(error_msg)
-            raise ValueError(error_msg)
-
-        if path is None:
-            path = f"{self._name}_processed.parquet"
-
-        self._logger.info(f"Saving dataframe to {path}")
-        self._data.write_parquet(path)
-        self._logger.info("Dataframe saved successfully")
-    '''
 
     def __repr__(self):
         """
