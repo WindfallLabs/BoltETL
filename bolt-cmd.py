@@ -58,7 +58,7 @@ def most_recent(datasource_name: str | None = None):
         recent: tuple[str, float] = sorted(ages, key=lambda x: x[1], reverse=True)[0]
         ts = dt.datetime.fromtimestamp(recent[1]).strftime("%Y-%m-%d %I:%M %p")
         t = dt.datetime.now() - dt.datetime.fromtimestamp(recent[1])
-        # stale_after = v.get("stale_after", 20)
+        # stale_after = v.get("stale_after", 20)  # TODO: handle stale-age
         stale_after = 20  # TODO:
         stale_color = "green"
 
@@ -197,7 +197,7 @@ def update(
             update_msg = "Updating datasources (force=True):"
         console.print(update_msg)
 
-        # for D in datasources:
+        # Log to each Datasource's log
         for d in datasources:
             d.logger.info("============== Bolt-CMD ==============")
             d.logger.info(f"Start ({d.name})")
@@ -211,7 +211,6 @@ def update(
                 db = bolt.env.warehouse.connect(False)
 
                 ## Hash (sha256) the source files
-                # current_hash = bolt.warehouse.hash_sources(d)  # TODO: replace (below)
                 d.logger.info("Calculating hash")
                 current_hash = d.metadata.hash_sources()
                 if not force:
@@ -234,9 +233,13 @@ def update(
                         continue
                 with console.status(f"[cyan]      Updating {d.name}...[/]"):
                     d.logger.info("Calling update command")
+
+                    # ========================================================
+                    # TODO: move to datasource
+                    # TODO: d.load(db)
+                    # ========================================================
                     # TODO: reinstate download option
                     df = d.update()  # noqa: F841
-                    # TODO: d.load(db) -- to remove much of this logic
                     # Write to database
                     if isinstance(df, gpd.GeoDataFrame):
                         db.sql(
@@ -245,11 +248,13 @@ def update(
                         tables_loaded += 1
                     elif isinstance(df, (pl.DataFrame, pd.DataFrame)):
                         db.sql(f"CREATE OR REPLACE TABLE {d.name} AS SELECT * FROM df")
+                        # ========================================================
                         tables_loaded += 1
 
                     db.sql(
                         f"INSERT OR REPLACE INTO data_updates VALUES ('{d.name}', '{dt.date.today()}', '{current_hash}')"
                     )
+                    # TODO: assert that table is inside database
                     console.print(f"        [green]Updated: {d.name}[/]")
                     d.logger.info("Update complete")
             except Exception as e:

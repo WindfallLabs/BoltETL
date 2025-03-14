@@ -415,9 +415,16 @@ class Warehouse[T]:
                 # TODO: try
                 con.sql(sql_obj.sql)
                 sql_file_count += 1
-        return sql_file_count, "Not compacted"  # TODO: ...
+
         # ...
         # Compact
+        compact_msg = "[yellow]Not compacted[/]"
+        if compact:
+            compact_sizes = self.compact()
+            compact_msg = (
+                f"Compacted Database: {compact_sizes[0]} KB -> {compact_sizes[1]} KB"
+            )
+        return sql_file_count, compact_msg  # TODO: ...
 
     # ========================================================================
     # Dunders
