@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from bolt import Datasource, Options
+from bolt.utils._logger import make_logger
 
 artifacts_path = Path(__file__).parent / "artifacts"
 log_path = artifacts_path / "logs"
@@ -31,5 +32,14 @@ def test_datasource_logger(log_file):
         source_filename="not-real.csv",
         options=options,
     )
-    ds.logger.info("I exist!")
-    assert "I exist!" in log_file.open().read()
+    msg = "I exist!"
+    ds.logger.info(msg)
+    assert msg in log_file.open().read()
+
+
+def test_io_logger():
+    iologger = make_logger("memory")
+    msg = "Written to memory!"
+    iologger.info(msg)
+    iologger.log.seek(0)
+    assert msg in iologger.log.read()

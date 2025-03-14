@@ -1,6 +1,5 @@
 from . import (
     schema,
-    version,
 )
 from ._download import download
 from ._excel_writer import dict_to_sheets

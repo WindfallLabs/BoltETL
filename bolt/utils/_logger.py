@@ -95,7 +95,7 @@ class IOLogger(logging.Logger):
 
 
 def make_logger(
-    name: str, log_dir: Path | None, format=None, level=logging.DEBUG
+    name: str, log_dir: Path | None = None, format=None, level=logging.DEBUG
 ) -> logging.Logger:
     # Default format
     if format is None:
