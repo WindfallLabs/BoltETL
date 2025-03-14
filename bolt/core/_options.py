@@ -20,9 +20,10 @@ class Options:
         kwargs (dict): Misc key-value pairs to add to the dataclass
 
     """
-    log_dir: Path|None = None
-    log_format: str|None = None
-    cache_path: Path|None = None
+
+    log_dir: Path | None = None
+    log_format: str | None = None
+    cache_path: Path | None = None
     register: bool = True
     # TODO: more?
     kwargs: field(default_factory=dict) = None  # type: ignore

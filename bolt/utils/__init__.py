@@ -1,26 +1,21 @@
 from . import (
-    funcs,
     schema,
     version,
 )
-from ._config import CONFIG_PATH, Config
+from ._config import Config
 from ._download import download
-from ._logger import make_logger, IOLogger
+from ._excel_writer import dict_to_sheets
+from ._logger import IOLogger, make_logger
 from ._rich import df_to_table
 from ._yearmonth import YearMonth
 
 config = Config()
-#CRS = config.crs
 
 __all__ = [
-    "CRS",
-    #"config",
-    "CONFIG_PATH",
     "df_to_table",
+    "dict_to_sheets",
     "download",
-    "funcs",
     "make_logger",
-    "import_user_package",
     "IOLogger",
     "schema",
     # ...

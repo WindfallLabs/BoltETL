@@ -7,13 +7,14 @@ from typing import Literal
 
 t_init_start = time.perf_counter_ns()
 
-import cyclopts
-import geopandas as gpd
-import pandas as pd
-import polars as pl
-from rich.console import Console
+import cyclopts  # noqa: E402
+import geopandas as gpd  # noqa: E402
+import pandas as pd  # noqa: E402
+import polars as pl  # noqa: E402
+from rich.console import Console  # noqa: E402
 
-import bolt
+import bolt  # noqa: E402
+import bolt.env  # noqa: E402
 
 __version__ = bolt.__version__
 
@@ -28,8 +29,7 @@ logo = """┏━━┓━━━━━┏┓━━┏┓━┏━━━┓┏━�
 ┗━━━┛┗━━┛┗━┛━┗━┛┗━━━┛━┗━━┛━┗━━━┛"""
 
 SCRIPT = Path(__file__).name
-DATASOURCES: dict[str, bolt.Datasource] = bolt.Datasource.registry
-REPORTS: dict[str, bolt.Report] = bolt.Report.registry
+WAREHOUSE: bolt.Warehouse = bolt.env.warehouse
 USER = f"{node()}/{getuser()}"
 
 
@@ -52,13 +52,13 @@ def most_recent(datasource_name: str | None = None):
     `python bolt-cmd.py most-recent`
     `python bolt-cmd.py most-recent MyDataset`
     """
-    for datasource_name, datasource in DATASOURCES.items():
+    for datasource_name, datasource in WAREHOUSE.datasource_registry.items():
         files = datasource.source_files
         ages = [(f.name, f.stat().st_mtime) for f in files]
         recent: tuple[str, float] = sorted(ages, key=lambda x: x[1], reverse=True)[0]
         ts = dt.datetime.fromtimestamp(recent[1]).strftime("%Y-%m-%d %I:%M %p")
         t = dt.datetime.now() - dt.datetime.fromtimestamp(recent[1])
-        #stale_after = v.get("stale_after", 20)
+        # stale_after = v.get("stale_after", 20)
         stale_after = 20  # TODO:
         stale_color = "green"
 
@@ -96,7 +96,7 @@ def report(option: Literal["list", "info", "run"], rpt_name: str = "", *args, **
     # NOTE: list option does not require 'rpt_name'
     if option == "list":
         console.print("Available Reports:")
-        for rpt in REPORTS.values():
+        for rpt in WAREHOUSE.report_registry.values():
             console.print(f"        [green]{rpt.name}[/]")
         console.print("For more info, use: ")
         console.print("[b blue]    `python bolt-cmd.py report info <report name>`[/]\n")
@@ -105,7 +105,7 @@ def report(option: Literal["list", "info", "run"], rpt_name: str = "", *args, **
     if not rpt_name:
         raise AttributeError("'rpt_name' argument is required")
 
-    rpt = REPORTS[rpt_name]
+    rpt = WAREHOUSE.report_registry[rpt_name]
     if option == "info":
         console.print("[white]Report Info:[/]")
         console.print(f"[green]    {rpt.name}[/]")
@@ -118,7 +118,7 @@ def report(option: Literal["list", "info", "run"], rpt_name: str = "", *args, **
         console.print(f"        (kwargs={kwargs})")
         try:
             rpt.run(*args, **kwargs)
-            if getattr(rpt, "_exported", False):
+            if getattr(rpt, "_exported", False):  # TODO: WIP
                 console.print(f"        Exported results to '{rpt.out_path}'")
         except Exception as e:
             console.print(f"        [red]Failed: {e}")
@@ -168,21 +168,20 @@ def update(
     datasources: list[bolt.datasources.Datasource] | None = None
     ## All
     if datasource_name == ".":
-        datasources = list(DATASOURCES.values())
+        datasources = list(WAREHOUSE.datasource_registry.values())
     ## Just the DB
     elif datasource_name.lower() == "db":
         datasources = []
     ## Just the specified one
     else:
-        #datasources = [getattr(bolt.datasources, datasource_name)]
-        datasources = [DATASOURCES[datasource_name]]
+        # datasources = [getattr(bolt.datasources, datasource_name)]
+        datasources = [WAREHOUSE.datasource_registry[datasource_name]]
 
     # Database
-    db = bolt.warehouse.connect()
-    db.sql(
-        "CREATE TABLE IF NOT EXISTS data_updates (datasource VARCHAR PRIMARY KEY, last_updated DATE, hash VARCHAR(7));"
-    )
-    db.close()
+    with bolt.env.warehouse.connect() as con:
+        con.sql(
+            "CREATE TABLE IF NOT EXISTS data_updates (datasource VARCHAR PRIMARY KEY, last_updated DATE, hash VARCHAR(7));"
+        )
 
     # A list of errors to print
     errors: list[tuple[str, Exception]] = []
@@ -198,7 +197,7 @@ def update(
             update_msg = "Updating datasources (force=True):"
         console.print(update_msg)
 
-        #for D in datasources:
+        # for D in datasources:
         for d in datasources:
             d.logger.info("============== Bolt-CMD ==============")
             d.logger.info(f"Start ({d.name})")
@@ -209,10 +208,10 @@ def update(
                     console.print(f"        [yellow]Skipped: {d.name} (ignored)[/]")
                     d.logger.info("Ignored (explicitly by user)")
                     continue
-                db = bolt.warehouse.connect()
+                db = bolt.env.warehouse.connect(False)
 
                 ## Hash (sha256) the source files
-                #current_hash = bolt.warehouse.hash_sources(d)  # TODO: replace (below)
+                # current_hash = bolt.warehouse.hash_sources(d)  # TODO: replace (below)
                 d.logger.info("Calculating hash")
                 current_hash = d.metadata.hash_sources()
                 if not force:
@@ -229,7 +228,9 @@ def update(
                         console.print(
                             f"        [yellow]Skipped: {d.name} (unchanged)[/]"
                         )
-                        d.logger.info(f"Update skipped (source files unchanged; {d.metadata.sources_hash})")
+                        d.logger.info(
+                            f"Update skipped (source files unchanged; {d.metadata.sources_hash})"
+                        )
                         continue
                 with console.status(f"[cyan]      Updating {d.name}...[/]"):
                     d.logger.info("Calling update command")
@@ -259,8 +260,8 @@ def update(
                     raise e
             finally:
                 db.close()
-                d.logger.info(f"End")
-                #d.logger.info("======================================")
+                d.logger.info("End")
+                # d.logger.info("======================================")
         console.print(f"    Tables Loaded: {tables_loaded}")
 
     # Update database
@@ -276,16 +277,18 @@ def update(
     else:
         with console.status("Updating database:"):
             try:
-                sql_file_count, compact_msg = bolt.warehouse.update_sql(compact_db=True)
-                bolt.warehouse.create_schemas()
+                # sql_file_count, compact_msg = WAREHOUSE.update_sql(compact_db=True)
+                sql_file_count, compact_msg = WAREHOUSE.rebuild(compact=True)
+                # WAREHOUSE.create_schema_table()
                 db_msg = (
-                    f"        [green]Updated: {bolt.config.db_name}[/]\n"
+                    f"        [green]Updated: {WAREHOUSE.name}[/]\n"
                     f"            SQL Files Executed: {sql_file_count}\n"
                     f"            {compact_msg}"
                 )
             except Exception as e:
-                errors.append((bolt.config.db_name, e))
-                db_msg = f"        [red]Failed: {bolt.config.db_name}[/]"
+                errors.append((WAREHOUSE.name, e))
+                db_msg = f"        [red]Failed: {WAREHOUSE.name}[/]"
+                console.print_exception()
         console.print(db_msg)
 
     console.print(f"\nErrors: {len(errors)}")
