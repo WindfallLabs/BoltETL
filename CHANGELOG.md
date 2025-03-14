@@ -9,7 +9,7 @@ Added:
 - User-defined instances of `Datasource`, `Report`, and `SQL` are added to a registry
 - User-defined objects are imported into `bolt.env` which must be imported explicitly
 - A graph-based SQL script sorter (who doesn't love a good DAG?)
-- Support for multiple environments
+- `Config` class (supports multiple environments)
 
 Changed:
 - Complete overhaul of the API; users now use decorated functions instead of classes
