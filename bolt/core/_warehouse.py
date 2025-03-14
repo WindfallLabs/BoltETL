@@ -67,6 +67,12 @@ class Warehouse[T]:
     def datasource_registry(self):
         return Datasource.registry
 
+    # TODO: I don't think we want to associate with datasources after their lifecycle
+    # return {
+    #     ds_name: ds_obj._set_warehouse(self)
+    #     for ds_name, ds_obj in Datasource.registry.items()
+    # }
+
     @property
     def report_registry(self):
         return {
@@ -297,6 +303,16 @@ class Warehouse[T]:
             r = con.sql(script.sql).pl()
         return r
 
+    def get_data(self, table_name):
+        """Return a table from the warehouse by name."""
+        if table_name not in self.list_tables():
+            raise KeyError(
+                f"'{table_name}' table/view does not exist"
+            )  # TODO: exception type
+        with self.connect() as con:
+            df = con.sql(f"SELECT * FROM {table_name};").pl()
+        return df
+
     def get_table_schema(  # TODO: broken? re-enable in bolt-cmd
         self,
         table: str,
@@ -389,10 +405,10 @@ class Warehouse[T]:
             table_list = con.sql(query).pl()["name"].to_list()
         return table_list
 
-    def load_dataframe(self, tablename: str, df: Any):
+    def load_dataframe(self, table_name: str, df: Any):
         """Load a DataFrame with DuckDB."""
         with self.connect() as con:
-            con.sql(f"CREATE OR REPLACE TABLE {tablename} AS SELECT * FROM df")
+            con.sql(f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM df")
         return
 
     def load_scripts_from_dir(self) -> None:  # Good and necessary?

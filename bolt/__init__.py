@@ -1,11 +1,13 @@
 """BoltETL"""
 
 from . import utils
+from ._config import Config
 from .core import SQL, Datasource, Metadata, Options, Report, Warehouse
 
 __version__ = "0.3.0"
 
 __all__ = [
+    "Config",
     "Datasource",
     "Metadata",
     "Options",

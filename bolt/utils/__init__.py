@@ -2,14 +2,11 @@ from . import (
     schema,
     version,
 )
-from ._config import Config
 from ._download import download
 from ._excel_writer import dict_to_sheets
 from ._logger import IOLogger, make_logger
 from ._rich import df_to_table
 from ._yearmonth import YearMonth
-
-config = Config()
 
 __all__ = [
     "df_to_table",

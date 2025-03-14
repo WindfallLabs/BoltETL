@@ -189,9 +189,6 @@ class Datasource[T]:
         return self.options.cache_path and self.options.cache_path.exists()
 
     # ========================================================================
-    # Misc methods
-
-    # ========================================================================
     # Wrapper methods
 
     def extract_wrapper(self, extract_func: Callable) -> Callable:
@@ -373,6 +370,9 @@ class Datasource[T]:
 
         # self.cache = _validate_wrapper
         return
+
+    # ========================================================================
+    # Misc methods
 
     # ========================================================================
     # Update method
