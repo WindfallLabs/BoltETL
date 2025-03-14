@@ -14,7 +14,7 @@ import holidays
 import polars as pl
 
 # from numpy import nan
-from bolt.utils import YearMonth, config
+from bolt.utils import YearMonth
 
 __changelog__ = """
 0.1.0 (2024-10):

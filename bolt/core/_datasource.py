@@ -206,13 +206,12 @@ class Datasource[T]:
         """
 
         @wraps(extract_func)
-        def _extract_wrapper(*args, no_transform=False, **kwargs):
+        def _extract_wrapper(*args, **kwargs):
             extracted_data = extract_func(self)
             self._raw_data = extracted_data
-            if no_transform:
-                self._data = extracted_data
             self.state = ETLState.EXTRACTED
             self.raw_data_origin = RawDataOrigin.EXTRACTED
+
             self.logger.info("Extracted")
             self.logger.info(f"- type={type(self._raw_data)}")
             self.logger.info(f"- len={len(self._raw_data)}")
@@ -340,13 +339,15 @@ class Datasource[T]:
         """
 
         @wraps(data_func)
-        def _load_wrapper(*args, **kwargs):
-            self._data = data_func(self)  # TODO:
+        def _data_wrapper(*args, **kwargs):
+            data = data_func(self)
+            self._raw_data = data
+            self._data = data
             self.state = ETLState.TRANSFORMED
             self.raw_data_origin = RawDataOrigin.DIRECTLY_SET
             return
 
-        self.load = _load_wrapper
+        self.extract = _data_wrapper
         return
 
     def validate_wrapper(self, validate_func: Callable) -> Callable:
