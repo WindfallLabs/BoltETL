@@ -54,6 +54,9 @@ def most_recent(datasource_name: str | None = None):
     """
     for datasource_name, datasource in WAREHOUSE.datasource_registry.items():
         files = datasource.source_files
+        source_info = f"{datasource.metadata.vendor}"
+        if datasource.metadata.software:
+            source_info += f" ({datasource.metadata.software})"
         ages = [(f.name, f.stat().st_mtime) for f in files]
         recent: tuple[str, float] = sorted(ages, key=lambda x: x[1], reverse=True)[0]
         ts = dt.datetime.fromtimestamp(recent[1]).strftime("%Y-%m-%d %I:%M %p")
@@ -74,6 +77,7 @@ def most_recent(datasource_name: str | None = None):
 
         console.print(f"[cyan]{datasource_name}[/]")
         console.print(f"Filename: '{recent[0]}'")
+        console.print(f"Source: {source_info}")
         console.print(f"Mod Date: [white]{ts}[/]")
         console.print(f"Age:      [{stale_color}]{age[0]} {age[1]}[/]")
         console.print()
@@ -211,26 +215,28 @@ def update(
                 db = bolt.env.warehouse.connect(False)
 
                 ## Hash (sha256) the source files
-                d.logger.info("Calculating hash")
-                current_hash = d.metadata.hash_sources()
-                if not force:
-                    # Ignore update for datasources with no changes to the source files
-                    ## Get the last hash (sha256) of the source files
-                    update_hash = db.sql(
-                        f"SELECT hash FROM data_updates WHERE datasource = '{d.name}'"
-                    ).pl()["hash"]
-                    ## Compare hashes and skip if they are the same
-                    if (
-                        not update_hash.is_empty()
-                        and current_hash == update_hash.item()
-                    ):
-                        console.print(
-                            f"        [yellow]Skipped: {d.name} (unchanged)[/]"
-                        )
-                        d.logger.info(
-                            f"Update skipped (source files unchanged; {d.metadata.sources_hash})"
-                        )
-                        continue
+                current_hash = None
+                if d.source_files:
+                    d.logger.info("Calculating hash")
+                    current_hash = d.metadata.hash_sources()
+                    if not force:
+                        # Ignore update for datasources with no changes to the source files
+                        ## Get the last hash (sha256) of the source files
+                        update_hash = db.sql(
+                            f"SELECT hash FROM data_updates WHERE datasource = '{d.name}'"
+                        ).pl()["hash"]
+                        ## Compare hashes and skip if they are the same
+                        if (
+                            not update_hash.is_empty()
+                            and current_hash == update_hash.item()
+                        ):
+                            console.print(
+                                f"        [yellow]Skipped: {d.name} (unchanged)[/]"
+                            )
+                            d.logger.info(
+                                f"Update skipped (source files unchanged; {d.metadata.sources_hash})"
+                            )
+                            continue
                 with console.status(f"[cyan]      Updating {d.name}...[/]"):
                     d.logger.info("Calling update command")
 

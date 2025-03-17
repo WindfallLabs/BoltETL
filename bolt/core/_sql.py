@@ -3,6 +3,8 @@
 import re
 from pathlib import Path
 
+from bolt.core._options import Options
+
 REGEX = re.compile(r"(?:FROM|JOIN|UPDATE|INSERT INTO|PIVOT) (\b\w+\b)")
 IGNORE_REGEX = re.compile(r"(?:WITH) (\b\w+\b)")
 
@@ -17,6 +19,7 @@ class SQL[T]:
         ttype: str | None = None,  # TODO: require? useful?
         path: Path | None = None,
         ignore_dependencies: set[str] | None = None,
+        options=None
     ):
         if not name:
             if path:
@@ -28,6 +31,7 @@ class SQL[T]:
         self.ttype = ttype
         self._path = path
         self.ignore_dependencies = ignore_dependencies or set()
+        self.options = options if options else Options()
 
         # Defaults
         self._sql: str | None = None

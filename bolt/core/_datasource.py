@@ -127,6 +127,8 @@ class Datasource[T]:
 
     @property
     def source_files(self) -> list[Path]:
+        if not self.source_dir and not self.source_filename:
+            return []
         return [
             p.absolute()
             for p in Path(self.source_dir).rglob(self.source_filename)
@@ -408,9 +410,10 @@ class Datasource[T]:
             raise ValueError(load_error_msg)
 
         # Extract data
-        self.logger.info(
-            f"Extracting data from {len(self.source_files)} file(s) in '{self.source_dir}'"
-        )
+        if self.raw_data_origin == RawDataOrigin.EXTRACTED:
+            self.logger.info(
+                f"Extracting data from {len(self.source_files)} file(s) in '{self.source_dir}'"
+            )
         self.extract()
 
         # Transform data if `transform` function was defined

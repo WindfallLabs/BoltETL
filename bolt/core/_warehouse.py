@@ -79,6 +79,7 @@ class Warehouse[T]:
         return {
             rpt_name: rpt_obj._set_warehouse(self)
             for rpt_name, rpt_obj in Report.registry.items()
+            if rpt_obj.options.register
         }
 
     @property
@@ -86,6 +87,7 @@ class Warehouse[T]:
         return {
             script_name: sql_obj._set_warehouse(self)
             for script_name, sql_obj in SQL.registry.items()
+            if sql_obj.options.register
         }
 
     # ========================================================================
@@ -433,8 +435,12 @@ class Warehouse[T]:
         sql_file_count = 0
         with self.connect() as con:
             for sql_obj in self.execution_plan():
-                # TODO: try
-                con.sql(sql_obj.sql)
+                print(sql_obj.path)
+                try:
+                    con.sql(sql_obj.sql)
+                except Exception as e:  # TODO: binder error?
+                    e.add_note(sql_obj.name)  # TODO: print sql file name
+                    raise e
                 sql_file_count += 1
 
         # ...
