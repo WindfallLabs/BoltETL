@@ -1,12 +1,13 @@
 """DuckDB Data Warehouse"""
 
 from functools import wraps
+from graphlib import TopologicalSorter
 from pathlib import Path
 from typing import Any, Callable, Generator, Literal
 from warnings import warn
 
 import duckdb
-from graphlib import TopologicalSorter
+import polars as pl
 
 from ._datasource import Datasource
 from ._report import Report
@@ -303,14 +304,18 @@ class Warehouse[T]:
             r = con.sql(script.sql).pl()
         return r
 
-    def get_data(self, table_name):
+    def get_data(self, table_name) -> pl.DataFrame:
         """Return a table from the warehouse by name."""
         if table_name not in self.list_tables():
             raise KeyError(
                 f"'{table_name}' table/view does not exist"
             )  # TODO: exception type
         with self.connect() as con:
-            df = con.sql(f"SELECT * FROM {table_name};").pl()
+            try:
+                df = con.sql(f"SELECT * FROM {table_name};").pl()
+            except pl.exceptions.ComputeError:
+                df = con.sql(f"SELECT * FROM {table_name};").df()
+                df = pl.from_pandas(df)
         return df
 
     def get_table_schema(  # TODO: broken? re-enable in bolt-cmd
