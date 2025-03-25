@@ -7,7 +7,7 @@ _Third Alpha Release Notes_
 Added:
 - A `Warehouse` object
 - User-defined instances of `Datasource`, `Report`, and `SQL` are added to a registry
-- User-defined objects are imported into `bolt.env` which must be imported explicitly
+- User-defined objects are lazy-loaded into `bolt.env` which must be imported explicitly
 - A graph-based SQL script sorter (who doesn't love a good DAG?)
 - `Config` class (supports multiple environments)
 
@@ -16,6 +16,7 @@ Changed:
 
 Removed:
 - No longer depends on user-defined config (`utils._config`)
+- Removed all dependence on `utils.servicedays`
 
 
 ## [0.2.0] - 2025-01-31

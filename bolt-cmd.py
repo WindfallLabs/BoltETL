@@ -33,6 +33,10 @@ WAREHOUSE: bolt.Warehouse = bolt.env.warehouse
 USER = f"{node()}/{getuser()}"
 
 
+# ============================================================================
+# Utility Functions
+
+
 def time_diff(start: float, end: float) -> str:
     """Calculates the minutes and seconds difference between two timestamps (floats)."""
     ms = (end - start) / 1000
@@ -41,6 +45,10 @@ def time_diff(start: float, end: float) -> str:
     sec = tot_secs % 60
     t_msg = f"{min}:{sec:.2f}"
     return t_msg
+
+
+# ============================================================================
+# App Commands
 
 
 @app.command
@@ -52,6 +60,7 @@ def most_recent(datasource_name: str | None = None):
     `python bolt-cmd.py most-recent`
     `python bolt-cmd.py most-recent MyDataset`
     """
+    bolt.env.datasources.load_all()
     for datasource_name, datasource in WAREHOUSE.datasource_registry.items():
         files = datasource.source_files
         source_info = f"{datasource.metadata.vendor}"
@@ -98,6 +107,7 @@ def report(option: Literal["list", "info", "run"], rpt_name: str = "", *args, **
     # TODO: consider an '--update' flag to update report dependencies
     # e.g. python bolt-cmd.py report run ParatransitNoShows --update
     # NOTE: list option does not require 'rpt_name'
+    bolt.env.reports.load_all()
     if option == "list":
         console.print("Available Reports:")
         for rpt in WAREHOUSE.report_registry.values():
@@ -150,6 +160,55 @@ def task(
 
 
 @app.command
+def execution_order():
+    """Displays the order that registered SQL files will be executed in."""
+    bolt.env.datasources.load_all()
+    file_order: list[str] = [i.path.name for i in WAREHOUSE.execution_plan() if i.path]
+    console.print(f"SQL Execution Order ({len(file_order)} files):")
+    for n, i in enumerate(file_order):
+        n += 1
+        num = f"{n}"
+        if n < 10:
+            num = f" {n}"
+        console.print(f"        {num}) [green]{i}[/]")
+    console.print()
+    return
+
+
+@app.command
+def schema(tbl: str, rows=50):
+    """Shows the (polars) schema of the given table or view."""
+    console.print(f"Schema of [green]{tbl}[/]")
+    data = WAREHOUSE.get_data(tbl)
+    df = pl.DataFrame({"column": data.columns, "dtype": data.dtypes})
+    pl.Config.set_tbl_rows(rows)
+    pl.Config.set_tbl_hide_dataframe_shape()
+    console.print(df)
+    console.print(f" Rows: {rows}/{data.shape[0]}  |  Cols: 2/2\n")
+    return
+
+
+@app.command
+def preview(tbl: str, rows=15, cols=10):
+    """Shows a preview of a given table or view."""
+    console.print(f"Preview of [green]{tbl}[/]")
+    pl.Config.set_tbl_rows(rows)
+    pl.Config.set_tbl_cols(cols)
+    pl.Config.set_tbl_hide_dataframe_shape()
+    data = WAREHOUSE.get_data(tbl)
+    console.print(data.head(rows))
+    console.print(f" Rows: {rows}/{data.shape[0]}  |  Cols: {cols}/{data.shape[1]}\n")
+    return
+
+
+@app.command
+def list_tables():
+    """Shows a list of tables in the warehouse."""
+    console.print(WAREHOUSE.list_tables())
+    return
+
+
+@app.command
 def update(
     datasource_name: str,
     ignore: list[str] | None = None,
@@ -166,6 +225,7 @@ def update(
         `python bolt-cmd.py update db`  # updates only the database
         `python bolt-cmd.py update <datasource>`  # updates <datasource>
     """
+    bolt.env.datasources.load_all()
     if not ignore:
         ignore = []
     # Determine datasources to process
@@ -189,9 +249,12 @@ def update(
 
     # A list of errors to print
     errors: list[tuple[str, Exception]] = []
-    # Report datasource loading failures
-    for failure in bolt.Datasource.failed_to_load:
-        errors.append(failure)
+    # Loading failures
+    loading_error_cnt = len(bolt.Datasource.failed_to_load) + len(
+        bolt.Report.failed_to_load
+    )
+    if loading_error_cnt > 0:
+        console.print(f"[red]Import Error(s) occured:[/] {loading_error_cnt}\n")
 
     # Process datasources
     if datasources:
@@ -201,61 +264,85 @@ def update(
             update_msg = "Updating datasources (force=True):"
         console.print(update_msg)
 
+        # Print loading errors
+        for ds_name, err in bolt.Datasource.failed_to_load:
+            if ignore_errors and ds_name not in ignore:
+                ignore.append(ds_name)
+            if ds_name in ignore:
+                console.print(
+                    f"        [yellow]Skipped: {ds_name} (error; [i]ignored[/i])[/]"
+                )
+            else:
+                console.print(f"        [red]Error:   {ds_name} (failed to import)[/]")
+                errors.append((ds_name, err))
+
         # Log to each Datasource's log
         for d in datasources:
             d.logger.info("============== Bolt-CMD ==============")
             d.logger.info(f"Start ({d.name})")
             d.logger.info(f"Args: `--force={force} --download={download}`")
             d.logger.info(f"Executed by {USER}")
+
+            if d.name in ignore:
+                console.print(f"        [yellow]Skipped: {d.name} ([i]ignored[/i])[/]")
+                d.logger.info("Ignored (explicitly by user)")
+                continue
+
+            do_update = True
+
+            # Try to hash and do recent update check
             try:
-                if d.name in ignore:
-                    console.print(f"        [yellow]Skipped: {d.name} (ignored)[/]")
-                    d.logger.info("Ignored (explicitly by user)")
-                    continue
                 db = bolt.env.warehouse.connect(False)
 
                 ## Hash (sha256) the source files
+                # TODO: hash the datasource / python file
+                # TODO: hash the data
                 current_hash = None
                 if d.source_files:
                     d.logger.info("Calculating hash")
                     current_hash = d.metadata.hash_sources()
                     if not force:
                         # Ignore update for datasources with no changes to the source files
-                        ## Get the last hash (sha256) of the source files
+                        # Get the last hash (sha256) of the source files
                         update_hash = db.sql(
                             f"SELECT hash FROM data_updates WHERE datasource = '{d.name}'"
                         ).pl()["hash"]
-                        ## Compare hashes and skip if they are the same
+                        # Compare hashes and skip if they are the same
                         if (
                             not update_hash.is_empty()
                             and current_hash == update_hash.item()
                         ):
-                            console.print(
-                                f"        [yellow]Skipped: {d.name} (unchanged)[/]"
-                            )
-                            d.logger.info(
-                                f"Update skipped (source files unchanged; {d.metadata.sources_hash})"
-                            )
-                            continue
+                            do_update = False
+            except Exception as e:
+                errors.append((d.name, e))
+            finally:
+                db.close()
+
+            if not do_update:
+                console.print(f"        [yellow]Skipped: {d.name} (unchanged)[/]")
+                d.logger.info(
+                    f"Update skipped (source files unchanged; {d.metadata.sources_hash})"
+                )
+                continue
+
+            try:
+                db = bolt.env.warehouse.connect(False)
+
+                # TODO: try `d.extract()`, `d.transform()`, and `d.load()` individually
+                # TODO: handle misc post-load callbacks
                 with console.status(f"[cyan]      Updating {d.name}...[/]"):
                     d.logger.info("Calling update command")
+                    df = d.update()  # noqa: F841
+                    # TODO: reinstate download option
 
                     # ========================================================
-                    # TODO: move to datasource
-                    # TODO: d.load(db)
-                    # ========================================================
-                    # TODO: reinstate download option
-                    df = d.update()  # noqa: F841
-                    # Write to database
+                    # TODO: remove all this (should be in each datasource's `load` method)
                     if isinstance(df, gpd.GeoDataFrame):
                         db.sql(
                             f"CREATE OR REPLACE TABLE {d.name} AS SELECT * FROM st_read('{d.options.cache_path}');"
                         )
-                        tables_loaded += 1
                     elif isinstance(df, (pl.DataFrame, pd.DataFrame)):
                         db.sql(f"CREATE OR REPLACE TABLE {d.name} AS SELECT * FROM df")
-                        # ========================================================
-                        tables_loaded += 1
 
                     db.sql(
                         f"INSERT OR REPLACE INTO data_updates VALUES ('{d.name}', '{dt.date.today()}', '{current_hash}')"
@@ -263,6 +350,7 @@ def update(
                     # TODO: assert that table is inside database
                     console.print(f"        [green]Updated: {d.name}[/]")
                     d.logger.info("Update complete")
+                    # ========================================================
             except Exception as e:
                 d.logger.critical(f"{e}")
                 errors.append((d.name, e))
@@ -272,8 +360,10 @@ def update(
             finally:
                 db.close()
                 d.logger.info("End")
-                # d.logger.info("======================================")
+            tables_loaded += 1
         console.print(f"    Tables Loaded: {tables_loaded}")
+        if ignore:
+            console.print(f"    Ignored: [yellow]{len(ignore)}[/]")
 
     # Update database
     console.print("\nUpdating database:")
@@ -284,11 +374,10 @@ def update(
         if len(errors) > 0:
             console.print("        [red]Skipped (errors)[/]")
         else:
-            console.print("        [yellow]Skipped (ignored)[/]")
+            console.print("        [yellow]Skipped ([i]ignored[/i])[/]")
     else:
         with console.status("Updating database:"):
             try:
-                # sql_file_count, compact_msg = WAREHOUSE.update_sql(compact_db=True)
                 sql_file_count, compact_msg = WAREHOUSE.rebuild(compact=True)
                 # WAREHOUSE.create_schema_table()
                 db_msg = (
@@ -302,9 +391,21 @@ def update(
                 console.print_exception()
         console.print(db_msg)
 
-    console.print(f"\nErrors: {len(errors)}")
+    # Print error info
+    err_cnt = f"{len(errors)}"
+    if len(errors) > 0:
+        err_cnt = f"[red]{len(errors)}[/]"
+    if ignore_errors:
+        console.print("\nErrors: [yellow i]ignored[/]")
+    else:
+        console.print(f"\nErrors: {err_cnt}")
     for name, err in errors:
         console.print(f"- [blue]{name}[/]: [red]{err}[/]")
+    # Report-loading errors
+    for rpt_name, err in bolt.Report.failed_to_load:
+        console.print(
+            f"- [blue]{rpt_name}[/] (Report): [red]Failed to import:[/]\n    [red]{err}[/]"
+        )
     return
 
 

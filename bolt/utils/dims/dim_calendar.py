@@ -1,7 +1,6 @@
 """Calendar Dimension."""
 
 import calendar
-import collections
 import datetime as dt
 from itertools import cycle
 
@@ -19,10 +18,7 @@ options = Options(
 )
 
 dim_calendar = Datasource(
-    name="dim_calendar",
-    source_dir=None,
-    source_filename=None,
-    options=options
+    name="dim_calendar", source_dir=None, source_filename=None, options=options
 )
 
 
@@ -30,8 +26,7 @@ dim_calendar = Datasource(
 def data(obj):
     this_year = dt.datetime.now().year
     years = range(
-        this_year - obj.options.year_range,
-        this_year + obj.options.year_range
+        this_year - obj.options.year_range, this_year + obj.options.year_range
     )
 
     cal = calendar.Calendar()
@@ -86,6 +81,8 @@ def data(obj):
             ),
             # Month
             pl.col("Date").dt.month().alias("Month"),
+            pl.col("Date").dt.strftime("%B").alias("MonthName"),
+            pl.col("Date").dt.strftime("%b").alias("MonthAbbr"),
             # Quarter
             pl.col("Date").dt.quarter().alias("Quarter"),
             # Fiscal Quarter
@@ -97,6 +94,15 @@ def data(obj):
                 )
                 .alias("FiscalQuarter")
             ),
+            # Day Abbr
+            pl.col("Date").dt.strftime("%a").alias("DayAbbr"),
+            # Day Type
+            (
+                pl.when(pl.col("DayName").is_in(["Saturday", "Sunday"]))
+                .then(pl.lit("Weekend"))
+                .otherwise(pl.lit("Weekday"))
+                .alias("DayType")
+            ),
         )
         .select(
             "Date",
@@ -106,7 +112,11 @@ def data(obj):
             "Quarter",
             "FiscalQuarter",
             "Month",
+            "MonthName",
+            "MonthAbbr",
             "DayName",
+            "DayAbbr",
+            "DayType",
             "Holiday",
         )
     )

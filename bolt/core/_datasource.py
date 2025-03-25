@@ -334,7 +334,7 @@ class Datasource[T]:
         The function that this decorator wraps must have the following arguments:
 
         Args:
-            data (Any): The processed data that was defined in the `transform` method
+            data (Any): The data to set
 
         Returns:
             None

@@ -6,7 +6,8 @@ from pathlib import Path
 from bolt.core._options import Options
 
 REGEX = re.compile(r"(?:FROM|JOIN|UPDATE|INSERT INTO|PIVOT) (\b\w+\b)")
-IGNORE_REGEX = re.compile(r"(?:WITH) (\b\w+\b)")
+# IGNORE_REGEX = re.compile(r"(?:WITH) (\b\w+\b)")
+IGNORE_REGEX = re.compile(r"(\w+)\s+?\bAS\b")
 
 
 class SQL[T]:
@@ -19,7 +20,7 @@ class SQL[T]:
         ttype: str | None = None,  # TODO: require? useful?
         path: Path | None = None,
         ignore_dependencies: set[str] | None = None,
-        options=None
+        options=None,
     ):
         if not name:
             if path:

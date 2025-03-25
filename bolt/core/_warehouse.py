@@ -1,13 +1,13 @@
 """DuckDB Data Warehouse"""
 
 from functools import wraps
-from graphlib import TopologicalSorter
 from pathlib import Path
 from typing import Any, Callable, Generator, Literal
 from warnings import warn
 
 import duckdb
 import polars as pl
+from graphlib import TopologicalSorter
 
 from ._datasource import Datasource
 from ._report import Report
@@ -236,7 +236,7 @@ class Warehouse[T]:
                 if dep in self.ignored_dependencies:
                     continue
                 elif dep in self.datasource_registry.keys():
-                    continue
+                    continue  # TODO: update dependent Datasources if bolt-cmd not called with "."
                 elif dep in default_duckdb_tables:  # TODO:
                     continue
                 clean_deps.add(dep)
@@ -435,11 +435,13 @@ class Warehouse[T]:
         sql_file_count = 0
         with self.connect() as con:
             for sql_obj in self.execution_plan():
-                print(sql_obj.path)
+                # print(sql_obj.path)
                 try:
                     con.sql(sql_obj.sql)
                 except Exception as e:  # TODO: binder error?
-                    e.add_note(sql_obj.name)  # TODO: print sql file name
+                    # e.add_note(sql_obj.name)  # TODO: print sql file name
+                    p = getattr(sql_obj, "path", sql_obj.name)
+                    e.args = (f"{e.args[0]} --> {p}", *e.args[1:])
                     raise e
                 sql_file_count += 1
 

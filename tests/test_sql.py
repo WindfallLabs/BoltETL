@@ -1,4 +1,4 @@
-from bolt.core._sql import REGEX, SQL
+from bolt.core._sql import IGNORE_REGEX, REGEX, SQL
 
 # @pytest.fixture
 # def cleanup():
@@ -18,6 +18,12 @@ def test_regex():
         GROUP BY some_field
     """
     assert REGEX.findall(multi)[0] == "table_in_multiline_statement"
+
+    # Ignores (CTE / with)
+    assert IGNORE_REGEX.findall("WITH first_cte AS ...\n), second_cte AS ...") == [
+        "first_cte",
+        "second_cte",
+    ]
 
 
 def test_sql():

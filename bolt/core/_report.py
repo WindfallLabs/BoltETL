@@ -10,6 +10,7 @@ from ._options import Options
 
 class Report[T]:
     registry: dict[str, T] = dict()
+    failed_to_load: set[tuple[str, Exception]] = set()
 
     def __init__(
         self,
