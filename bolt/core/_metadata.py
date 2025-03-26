@@ -70,3 +70,8 @@ class Metadata:
         for k, v in self.__dict__.items():
             string_dict[str(k)] = str(v)
         return json.dumps(string_dict, indent=4)
+
+    def __repr__(self):
+        if self.datasource:
+            return f"<Metadata(datasource='{self.datasource.name}')>"
+        return f"<Metadata(datasource=None)>"

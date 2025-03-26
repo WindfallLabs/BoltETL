@@ -91,6 +91,7 @@ class Datasource[T]:
 
         # Handle options
         self.options = options if options else Options()
+        self.options.parent = self
 
         # Logging setup
         self.logger: Logger | IOLogger = make_logger(

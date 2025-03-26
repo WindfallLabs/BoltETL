@@ -31,9 +31,15 @@ class Options:
     def __post_init__(self):
         if self.kwargs:
             [setattr(self, k, v) for k, v in self.kwargs.items()]
+        self.parent = None
 
     def to_json(self):
         string_dict = {}
         for k, v in self.__dict__.items():
             string_dict[str(k)] = str(v)
         return json.dumps(string_dict, indent=4)
+
+    def __repr__(self):
+        if self.parent:
+            return f"<Options(parent='{self.parent.name}')>"
+        return f"<Options(parent=None)>"
