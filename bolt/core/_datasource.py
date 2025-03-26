@@ -35,26 +35,30 @@ class ETLState(Enum):
     DIRECTLY_SET = "DIRECTLY_SET"
     VALIDATED = "VALIDATED"
     LOADED = "LOADED"
+    READ_FROM_WAREHOUSE = "READ_FROM_WAREHOUSE"
+
+    def __repr__(self):
+        return f"<ETLState.{self.name}>"
 
     def __lt__(self, other):
-        return self._member_names_.index(self.name) < other._member_names_.index(
-            other.name
-        )
+        this = self._member_names_.index(self.name)
+        oth = other._member_names_.index(other.name)
+        return this < oth
 
     def __le__(self, other):
-        return self._member_names_.index(self.name) <= other._member_names_.index(
-            other.name
-        )
+        this = self._member_names_.index(self.name)
+        oth = other._member_names_.index(other.name)
+        return this <= oth
 
     def __gt__(self, other):
-        return self._member_names_.index(self.name) > other._member_names_.index(
-            other.name
-        )
+        this = self._member_names_.index(self.name)
+        oth = other._member_names_.index(other.name)
+        return this > oth
 
     def __ge__(self, other):
-        return self._member_names_.index(self.name) >= other._member_names_.index(
-            other.name
-        )
+        this = self._member_names_.index(self.name)
+        oth = other._member_names_.index(other.name)
+        return this >= oth
 
 
 class Datasource[T]:
@@ -378,6 +382,15 @@ class Datasource[T]:
     # ========================================================================
     # Misc methods
 
+    # def read_warehouse(self) -> None:
+    #     """Load the processed data from the warehouse/database."""
+    #     # TODO: should we enable users to access end-of-lifecycle data as a 'source'?
+    #     import bolt.env
+    #     df: pl.DataFrame = bolt.env.warehouse.get_data(self.name)
+    #     self._data = df
+    #     self.state = ETLState.READ_FROM_WAREHOUSE
+    #     return
+
     # ========================================================================
     # Update method
 
@@ -448,6 +461,11 @@ class Datasource[T]:
         if not self.load and TEST_FLAG:
             self.logger.info("Loading data")
             self.load()
+
+        if self.metadata:
+            import bolt.env
+
+            self.metadata._insert(bolt.env.warehouse)
 
         self.logger.info("Update completed")
         return self._data

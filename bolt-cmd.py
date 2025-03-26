@@ -219,6 +219,10 @@ def update(
 ):
     """Updates datasource by name, or all configured datasources ('.').
 
+    Args
+        ...
+        ignore_errors (bool):
+
     Alternatively, update only the data warehouse using 'db'.
     Examples:
         `python bolt-cmd.py update .`  # updates everything
@@ -240,12 +244,6 @@ def update(
     else:
         # datasources = [getattr(bolt.datasources, datasource_name)]
         datasources = [WAREHOUSE.datasource_registry[datasource_name]]
-
-    # Database
-    with bolt.env.warehouse.connect() as con:
-        con.sql(
-            "CREATE TABLE IF NOT EXISTS data_updates (datasource VARCHAR PRIMARY KEY, last_updated DATE, hash VARCHAR(7));"
-        )
 
     # A list of errors to print
     errors: list[tuple[str, Exception]] = []
@@ -297,20 +295,18 @@ def update(
                 ## Hash (sha256) the source files
                 # TODO: hash the datasource / python file
                 # TODO: hash the data
-                current_hash = None
                 if d.source_files:
                     d.logger.info("Calculating hash")
-                    current_hash = d.metadata.hash_sources()
                     if not force:
                         # Ignore update for datasources with no changes to the source files
                         # Get the last hash (sha256) of the source files
                         update_hash = db.sql(
-                            f"SELECT hash FROM data_updates WHERE datasource = '{d.name}'"
-                        ).pl()["hash"]
+                            f"SELECT sources_hash FROM bolt_metadata WHERE table_name = '{d.name}'"
+                        ).pl()["sources_hash"]
                         # Compare hashes and skip if they are the same
                         if (
                             not update_hash.is_empty()
-                            and current_hash == update_hash.item()
+                            and d.metadata.sources_hash == update_hash.item()
                         ):
                             do_update = False
             except Exception as e:
@@ -344,9 +340,9 @@ def update(
                     elif isinstance(df, (pl.DataFrame, pd.DataFrame)):
                         db.sql(f"CREATE OR REPLACE TABLE {d.name} AS SELECT * FROM df")
 
-                    db.sql(
-                        f"INSERT OR REPLACE INTO data_updates VALUES ('{d.name}', '{dt.date.today()}', '{current_hash}')"
-                    )
+                    # db.sql(
+                    #    f"INSERT OR REPLACE INTO bolt_metadata VALUES ('{d.name}', '{dt.date.today()}', '{current_hash}')"
+                    # )
                     # TODO: assert that table is inside database
                     console.print(f"        [green]Updated: {d.name}[/]")
                     d.logger.info("Update complete")

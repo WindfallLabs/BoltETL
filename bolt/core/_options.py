@@ -42,4 +42,4 @@ class Options:
     def __repr__(self):
         if self.parent:
             return f"<Options(parent='{self.parent.name}')>"
-        return f"<Options(parent=None)>"
+        return "<Options(parent=None)>"

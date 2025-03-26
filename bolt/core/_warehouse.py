@@ -13,6 +13,18 @@ from ._datasource import Datasource
 from ._report import Report
 from ._sql import SQL
 
+init_scripts = [
+    """
+    CREATE TABLE IF NOT EXISTS bolt_metadata (
+        table_name VARCHAR PRIMARY KEY,
+        last_updated TIMESTAMP,
+        sources_hash VARCHAR(7),
+        metadata_hash VARCHAR(7),
+        metadata VARCHAR
+    );
+    """,
+]
+
 
 class Warehouse[T]:
     """Bolt's default data warehouse (DuckDB)."""
@@ -67,12 +79,6 @@ class Warehouse[T]:
     @property
     def datasource_registry(self):
         return Datasource.registry
-
-    # TODO: I don't think we want to associate with datasources after their lifecycle
-    # return {
-    #     ds_name: ds_obj._set_warehouse(self)
-    #     for ds_name, ds_obj in Datasource.registry.items()
-    # }
 
     @property
     def report_registry(self):
@@ -174,6 +180,9 @@ class Warehouse[T]:
             except duckdb.CatalogException:
                 # warn(f"Skipped loading function : `{fn.__name__}`")
                 pass
+
+        for init_script in init_scripts:
+            con.sql(init_script)
 
         class _DuckDbCtx:
             def __init__(self):
