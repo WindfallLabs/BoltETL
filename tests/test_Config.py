@@ -39,10 +39,20 @@ def test_use_env(cfg):
     cfg.init()
     cfg.add_env("TEST", Path(__file__).parent / "artifacts", set_default=True)
     cfg.use_env("TEST")
-    assert "artifacts" in str(cfg.env_path)
+    assert "artifacts" in str(cfg.env_dir)
 
 
 def test_reserved_keyword(cfg):
     cfg.init()
     with pytest.raises(KeyError):
         cfg.add_env("BOLT-ENV", "...")
+
+
+def test_get_default(cfg):
+    cfg.init()
+    assert cfg.get_default_env() == Path("~").expanduser() / ".bolt"
+
+
+def test_list_envs(cfg):
+    cfg.init()
+    assert len(cfg.list_envs()) == 2

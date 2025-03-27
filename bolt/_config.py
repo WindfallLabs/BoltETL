@@ -1,4 +1,22 @@
-"""Configuration object."""
+"""Configuration object.
+
+BoltETL uses the dotenv package to handle environments.
+
+When initialized with `Config.init`, a ".env" file is created in the
+current user's directory (e.g. 'C:\\Users\\<USER>\\.bolt' on Windows).
+
+User's can set their own environment directory using something like:
+```python
+import bolt
+
+bolt.Config.add_env("main", "C:\\Workspace\\bolt")
+bolt.Config.set_default_env("main")
+
+# or by setting the set_default arg to True
+bolt.Config.add_env("main", "C:\\Workspace\\bolt", True)
+```
+
+"""
 
 from pathlib import Path
 
@@ -12,10 +30,10 @@ class Config:
     _default_env_line = f"BOLT-DEFAULT={str(config_dir)}\n"
     env_file = config_dir / ".env"
     if env_file.exists():
-        env_path = Path(dotenv.dotenv_values(env_file)[_ENV_KEY])
+        env_dir = Path(dotenv.dotenv_values(env_file)[_ENV_KEY])
     else:
-        env_path = config_dir
-    log_dir: Path = env_path / "logs"
+        env_dir = config_dir
+    log_dir: Path = env_dir / "logs"
 
     @classmethod
     def init(cls, overwrite=False):
@@ -37,7 +55,6 @@ class Config:
         new_default = dotenv.dotenv_values(cls.env_file)[env_name]
         # Read entire .env
         lines = cls.env_file.open().readlines()
-        # lines[2] = f"{_ENV_KEY}=" + "{" + str(env_name) + "}\n"
         lines[2] = f"{_ENV_KEY}={new_default}\n"
         cls.env_file.open("w").writelines(lines)
         return
@@ -63,10 +80,14 @@ class Config:
     @classmethod
     def use_env(cls, env_name: str):
         """Use a saved environment."""
-        cls.env_path = Path(dotenv.dotenv_values(cls.env_file)[env_name])
+        cls.env_dir = Path(dotenv.dotenv_values(cls.env_file)[env_name])
         return
 
     @classmethod
     def get_default_env(cls):
         """Best way to load the default environment."""
-        return Path(dotenv.dotenv_values(cls.env_file)["BOLT-ENV"])
+        return Path(dotenv.dotenv_values(cls.env_file)["BOLT-DEFAULT"])
+
+    @classmethod
+    def list_envs(cls):
+        return list(dotenv.dotenv_values(cls.env_file).items())

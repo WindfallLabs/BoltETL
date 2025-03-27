@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from bolt import Datasource, Config
+from bolt import Config, Datasource
 from bolt.utils._logger import make_logger
 
 artifacts_path = Path(__file__).parent / "artifacts"
