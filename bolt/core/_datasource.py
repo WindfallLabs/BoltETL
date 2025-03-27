@@ -61,10 +61,22 @@ class ETLState(Enum):
         return this >= oth
 
 
+class _DatasourceRegistry(dict):
+    def __init__(self):
+        super().__init__()
+
+    def __getitem__(self, key):
+        if key not in self:
+            import bolt.env
+
+            return getattr(bolt.env.datasources, key)
+
+
 class Datasource[T]:
     """."""
 
     registry: dict[str, T] = dict()
+    # registry = _DatasourceRegistry()
     failed_to_load: set[tuple[str, Exception]] = set()
 
     def __init__(
@@ -148,7 +160,10 @@ class Datasource[T]:
 
     @property
     def data(self) -> Optional[Any]:
-        """Processed data (transformed or read from cache)."""
+        """Processed data (transformed, set directly, or read from cache)."""
+        # Call extract automatically when DIRECTLY_SET
+        if self._data is None and self.raw_data_origin == RawDataOrigin.DIRECTLY_SET:
+            self.extract()
         return self._data
 
     @property
@@ -273,6 +288,8 @@ class Datasource[T]:
         def _load_wrapper(warehouse: Warehouse, *args, **kwargs):
             load_func(self, warehouse)
             self.state = ETLState.LOADED
+            self.metadata._insert(warehouse)
+            self.logger.info("Metadata inserted")
             return
 
         self.load = _load_wrapper
@@ -348,13 +365,13 @@ class Datasource[T]:
         @wraps(data_func)
         def _data_wrapper(*args, **kwargs):
             data = data_func(self)
-            self._raw_data = data
+            self._raw_data = data  # TODO: or should raw be None?
             self._data = data
-            self.state = ETLState.TRANSFORMED
-            self.raw_data_origin = RawDataOrigin.DIRECTLY_SET
             return
 
         self.extract = _data_wrapper
+        self.state = ETLState.TRANSFORMED
+        self.raw_data_origin = RawDataOrigin.DIRECTLY_SET
         return
 
     def validate_wrapper(self, validate_func: Callable) -> Callable:
@@ -382,6 +399,20 @@ class Datasource[T]:
     # ========================================================================
     # Misc methods
 
+    def _default_load(self, warehouse):
+        # Default data loader
+        self.logger.info("Loading data (with default loader)")
+        try:
+            df = self.data  # noqa: F841
+            with warehouse.connect() as con:
+                con.sql(f"CREATE OR REPLACE TABLE {self.name} AS SELECT * FROM df")
+        except Exception as e:
+            self.logger.critical("FAILED to load (with default loader)")
+            raise e
+        self.metadata._insert(warehouse)
+        self.logger.info("Metadata inserted")
+        return
+
     # def read_warehouse(self) -> None:
     #     """Load the processed data from the warehouse/database."""
     #     # TODO: should we enable users to access end-of-lifecycle data as a 'source'?
@@ -394,9 +425,12 @@ class Datasource[T]:
     # ========================================================================
     # Update method
 
-    def update(self) -> Any:  # TODO: consider 'execute_pipeline()'
+    def update(self, warehouse) -> Any:  # TODO: consider 'execute_pipeline()'
         """
         Executes the ETL operations.
+
+        Args:
+            warehouse (bolt.Warehouse): The user's warehouse/database (bolt.env.warehouse)
 
         Returns:
             data (Any): Processed data (probably a DataFrame)
@@ -406,9 +440,8 @@ class Datasource[T]:
             ValidationError: If any validation fails
         """
         self.logger.info(f"Starting update for {self._name}")
-        self.logger.debug(f"Metadata:\n{self.metadata.to_json()}")
-        self.logger.debug(f"Options:\n{self.options.to_json()}")
-        TEST_FLAG = False  # TODO: remove when bolt-cmd no longer handles this
+        self.logger.debug(f"Metadata:\n{self.metadata.to_json(json_indent=4)}")
+        self.logger.debug(f"Options:\n{self.options.to_json()}")  # TODO: json_indent=4
 
         # Check that `extract` method is set
         # Unless directly set with `data_wrapper`
@@ -418,11 +451,12 @@ class Datasource[T]:
             raise ValueError(extract_error_msg)
 
         # Check that `load` method is set
-        if not self.load and TEST_FLAG:
-            load_error_msg = "A `load` function is required"  # TODO: is it though?
-            self.logger.critical(load_error_msg)
-            raise ValueError(load_error_msg)
+        # if not self.load and TEST_FLAG:
+        #     load_error_msg = "A `load` function is required"  # TODO: is it though?
+        #     self.logger.critical(load_error_msg)
+        #     raise ValueError(load_error_msg)
 
+        # --------------------------------------------------------------------
         # Extract data
         if self.raw_data_origin == RawDataOrigin.EXTRACTED:
             self.logger.info(
@@ -430,6 +464,7 @@ class Datasource[T]:
             )
         self.extract()
 
+        # --------------------------------------------------------------------
         # Transform data if `transform` function was defined
         if self.transform:
             self.logger.info("Applying transformation(s)")
@@ -437,7 +472,9 @@ class Datasource[T]:
         else:
             self.logger.warning("No extract function defined")
 
-        # Cache transformed data to disk (staging)
+        # --------------------------------------------------------------------
+        # Cache
+        # Transformed data optionally saved to disk
         if self.cache_write is None and self.options.cache_path:
             self.logger.warning(
                 f"No `cache` function specified; but `options.cache_path` was: '{self.options.cache_path}'"
@@ -451,24 +488,24 @@ class Datasource[T]:
             self.cache_write()
             # Else, no caching
 
+        # --------------------------------------------------------------------
+        # Validate
         # TODO: validation
         if self.validate:
             self.logger.info("Validating data")
             self.validate()
 
-        # Execute the load function (must exist)
-        TEST_FLAG = False  # TODO: remove when bolt-cmd no longer handles this
-        if not self.load and TEST_FLAG:
+        # --------------------------------------------------------------------
+        # Load
+        if self.load:
             self.logger.info("Loading data")
-            self.load()
-
-        if self.metadata:
-            import bolt.env
-
-            self.metadata._insert(bolt.env.warehouse)
+            self.load(warehouse)
+        else:
+            self._default_load(warehouse)
 
         self.logger.info("Update completed")
-        return self._data
+        # --------------------------------------------------------------------
+        return
 
     # ========================================================================
     # Dunder methods

@@ -8,8 +8,7 @@ from typing import Literal
 t_init_start = time.perf_counter_ns()
 
 import cyclopts  # noqa: E402
-import geopandas as gpd  # noqa: E402
-import pandas as pd  # noqa: E402
+import duckdb  # noqa: E402
 import polars as pl  # noqa: E402
 from rich.console import Console  # noqa: E402
 
@@ -242,7 +241,6 @@ def update(
         datasources = []
     ## Just the specified one
     else:
-        # datasources = [getattr(bolt.datasources, datasource_name)]
         datasources = [WAREHOUSE.datasource_registry[datasource_name]]
 
     # A list of errors to print
@@ -251,8 +249,21 @@ def update(
     loading_error_cnt = len(bolt.Datasource.failed_to_load) + len(
         bolt.Report.failed_to_load
     )
+    loading_errs = set()
     if loading_error_cnt > 0:
-        console.print(f"[red]Import Error(s) occured:[/] {loading_error_cnt}\n")
+        console.print(f"[red]Import Error(s) occured:[/] {loading_error_cnt}")
+        for failed in bolt.Datasource.failed_to_load:
+            loading_errs.add(failed)
+            # TODO: log
+            if failed in ignore or ignore_errors:
+                console.print(
+                    f"        [yellow]Error:   {failed[0]} ([i]ignored[/i])[/]"
+                )
+            else:
+                console.print(
+                    f"        [red]Error:   {failed[0]}[/]"
+                )
+        console.print()
 
     # Process datasources
     if datasources:
@@ -261,18 +272,6 @@ def update(
         if force:
             update_msg = "Updating datasources (force=True):"
         console.print(update_msg)
-
-        # Print loading errors
-        for ds_name, err in bolt.Datasource.failed_to_load:
-            if ignore_errors and ds_name not in ignore:
-                ignore.append(ds_name)
-            if ds_name in ignore:
-                console.print(
-                    f"        [yellow]Skipped: {ds_name} (error; [i]ignored[/i])[/]"
-                )
-            else:
-                console.print(f"        [red]Error:   {ds_name} (failed to import)[/]")
-                errors.append((ds_name, err))
 
         # Log to each Datasource's log
         for d in datasources:
@@ -290,7 +289,7 @@ def update(
 
             # Try to hash and do recent update check
             try:
-                db = bolt.env.warehouse.connect(False)
+                db = WAREHOUSE.connect(False)
 
                 ## Hash (sha256) the source files
                 # TODO: hash the datasource / python file
@@ -322,35 +321,25 @@ def update(
                 continue
 
             try:
-                db = bolt.env.warehouse.connect(False)
-
-                # TODO: try `d.extract()`, `d.transform()`, and `d.load()` individually
-                # TODO: handle misc post-load callbacks
                 with console.status(f"[cyan]      Updating {d.name}...[/]"):
                     d.logger.info("Calling update command")
-                    df = d.update()  # noqa: F841
-                    # TODO: reinstate download option
-
-                    # ========================================================
-                    # TODO: remove all this (should be in each datasource's `load` method)
-                    if isinstance(df, gpd.GeoDataFrame):
-                        db.sql(
-                            f"CREATE OR REPLACE TABLE {d.name} AS SELECT * FROM st_read('{d.options.cache_path}');"
+                    # TODO: try `d.extract()`, `d.transform()`, and `d.load()` individually
+                    d.update(WAREHOUSE)  # TODO: reinstate download option
+                    # TODO: handle misc post-load callbacks
+                    # Confirm load success
+                    if d.name not in WAREHOUSE.list_tables():
+                        d.logger.criticald("FAILURE: Table load could not be confirmed")
+                        raise duckdb.DataError(
+                            "Table does not exist after attempting load"
                         )
-                    elif isinstance(df, (pl.DataFrame, pd.DataFrame)):
-                        db.sql(f"CREATE OR REPLACE TABLE {d.name} AS SELECT * FROM df")
-
-                    # db.sql(
-                    #    f"INSERT OR REPLACE INTO bolt_metadata VALUES ('{d.name}', '{dt.date.today()}', '{current_hash}')"
-                    # )
-                    # TODO: assert that table is inside database
+                    d.logger.info("Table load confirmed")
                     console.print(f"        [green]Updated: {d.name}[/]")
                     d.logger.info("Update complete")
                     # ========================================================
             except Exception as e:
                 d.logger.critical(f"{e}")
                 errors.append((d.name, e))
-                console.print(f"        [red]Failed: {d.name}[/]")
+                console.print(f"        [red]Failed:  {d.name}[/]")
                 if not ignore_errors:
                     raise e
             finally:
@@ -361,8 +350,11 @@ def update(
         if ignore:
             console.print(f"    Ignored: [yellow]{len(ignore)}[/]")
 
+    if len(datasources) > 0:
+        console.print()
+
     # Update database
-    console.print("\nUpdating database:")
+    console.print("Updating database:")
     if len(errors) > 0 and not ignore_errors:
         skip_db = True  # Override the skip_db flag
 
@@ -388,19 +380,23 @@ def update(
         console.print(db_msg)
 
     # Print error info
-    err_cnt = f"{len(errors)}"
+    err_cnt = f"{len(errors) + loading_error_cnt}"
     if len(errors) > 0:
         err_cnt = f"[red]{len(errors)}[/]"
     if ignore_errors:
         console.print("\nErrors: [yellow i]ignored[/]")
     else:
         console.print(f"\nErrors: {err_cnt}")
+    for failed_ds, err in loading_errs:
+        console.print(
+            f"- [blue]{failed_ds}[/] (Datasource) [red]failed to import:[/]\n    [red b]{err}[/]"
+        )
     for name, err in errors:
         console.print(f"- [blue]{name}[/]: [red]{err}[/]")
     # Report-loading errors
     for rpt_name, err in bolt.Report.failed_to_load:
         console.print(
-            f"- [blue]{rpt_name}[/] (Report): [red]Failed to import:[/]\n    [red]{err}[/]"
+            f"- [blue]{rpt_name}[/] (Report) [red]failed to import:[/]\n    [red b]{err}[/]"
         )
     return
 

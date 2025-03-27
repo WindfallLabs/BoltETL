@@ -14,7 +14,8 @@ calendar.setfirstweekday(1)
 
 options = Options(
     # TODO: some way to toggle ignored
-    kwargs={"year_range": 25}
+    register=False,
+    kwargs={"year_range": 25},
 )
 
 dim_calendar = Datasource(

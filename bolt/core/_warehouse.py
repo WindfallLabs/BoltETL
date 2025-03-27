@@ -269,12 +269,17 @@ class Warehouse[T]:
 
     def execution_plan(self) -> Generator[T, None, None]:
         """Generates SQL scripts sorted by dependency requirements."""
+        import bolt.env
+
+        bolt.env.datasources.load_all()
         graph: list[tuple[str, str, set]] = self.create_dependency_graph()
 
         for dep_name, dep_type, deps in graph:
             # Raise error on missing dependencies
             if dep_type == "MISSING":
-                raise KeyError(f"Dependency '{dep_name}' is not defined")
+                raise KeyError(
+                    f"Dependency '{dep_name}' is not defined"
+                )  # TODO: should we raise here or let it roll?
             obj = self.sql_registry[dep_name]
             yield obj
 
