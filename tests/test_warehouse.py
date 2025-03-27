@@ -101,8 +101,10 @@ def test_sql_function(warehouse):
         return f"FY{str(year)[2:4]}"
 
     with warehouse.connect() as con:
-        fy = con.sql("SELECT fiscal_year(202503) AS FY").pl()
-    assert fy["FY"].item() == "FY25"
+        cy24 = con.sql("SELECT fiscal_year(202408) AS FY").pl()
+        fy25 = con.sql("SELECT fiscal_year(202503) AS FY").pl()
+    assert fy25["FY"].item() == "FY25"
+    assert cy24["FY"].item() == "FY25"
 
 
 def test_create_depenedency_graph(warehouse):

@@ -22,7 +22,7 @@ class Metadata:
 
     description: str | None = None
     data_dict: dict[str, str] | None = None
-    tags: set[str] | None = None
+    tags: list[str] | tuple[str] | set[str] | None = None
     vendor: str | None = None
     software: str | None = None
     source_url: str | None = None
@@ -36,6 +36,7 @@ class Metadata:
     def __post_init__(self):
         self._sources_hash = None
         if self.tags:
+            self.tags = set(self.tags)
             for tag in self.tags:
                 if not tag.startswith("#"):
                     self.tags.remove(tag)

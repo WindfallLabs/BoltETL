@@ -36,7 +36,7 @@ class ETLState(Enum):
     DIRECTLY_SET = "DIRECTLY_SET"
     VALIDATED = "VALIDATED"
     LOADED = "LOADED"
-    READ_FROM_WAREHOUSE = "READ_FROM_WAREHOUSE"
+    # READ_FROM_WAREHOUSE = "READ_FROM_WAREHOUSE"
 
     def __repr__(self):
         return f"<ETLState.{self.name}>"
@@ -62,22 +62,10 @@ class ETLState(Enum):
         return this >= oth
 
 
-class _DatasourceRegistry(dict):
-    def __init__(self):
-        super().__init__()
-
-    def __getitem__(self, key):
-        if key not in self:
-            import bolt.env
-
-            return getattr(bolt.env.datasources, key)
-
-
 class Datasource[T]:
     """."""
 
     registry: dict[str, T] = dict()
-    # registry = _DatasourceRegistry()
     failed_to_load: set[tuple[str, Exception]] = set()
 
     def __init__(
@@ -180,16 +168,17 @@ class Datasource[T]:
     @property
     def is_extracted(self):
         """Whether or not the `extract` method was called successfully."""
-        return (
-            # self.state >= ETLState.EXTRACTED
-            # or self.raw_data_origin != RawDataOrigin.INIT
-            self.raw_data_origin == RawDataOrigin.EXTRACTED
-        )
+        return self.state >= ETLState.EXTRACTED and (self.has_raw_data or self.has_data)
 
     @property
     def is_transformed(self):
         """Whether or not the `transform` method was called successfully."""
         return self.state >= ETLState.TRANSFORMED
+
+    @property
+    def is_directly_set(self):
+        """Whether or not the data was set within a `data_wrapper`."""
+        return self.raw_data_origin == RawDataOrigin.DIRECTLY_SET and self.has_data
 
     @property
     def is_loaded(self):
@@ -200,11 +189,6 @@ class Datasource[T]:
     def is_cached_data(self):
         """Whether or not `self.data` was read from cache."""
         return self.raw_data_origin == RawDataOrigin.FROM_CACHE
-
-    @property
-    def is_directly_set(self):
-        """Whether or not the data was set within a `data_wrapper`."""
-        return self.raw_data_origin == RawDataOrigin.DIRECTLY_SET
 
     @property
     def has_cached_data(self):
@@ -233,14 +217,13 @@ class Datasource[T]:
             extracted_data = extract_func(self)
             self._raw_data = extracted_data
             self.state = ETLState.EXTRACTED
-            self.raw_data_origin = RawDataOrigin.EXTRACTED
-
             self.logger.info("Extracted")
             self.logger.info(f"- type={type(self._raw_data)}")
             self.logger.info(f"- len={len(self._raw_data)}")
             return
 
         self.extract = _extract_wrapper
+        self.raw_data_origin = RawDataOrigin.EXTRACTED
         return
 
     def transform_wrapper(self, transform_func: Callable) -> Callable:

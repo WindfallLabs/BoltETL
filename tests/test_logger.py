@@ -38,7 +38,26 @@ def test_datasource_logger(log_file):
 
 def test_io_logger():
     iologger = make_logger("memory")
-    msg = "Written to memory!"
-    iologger.info(msg)
+    # DEBUG
+    debug_msg = "Debug message written to memory!"
+    iologger.debug(debug_msg)
+    # INFO
+    info_msg = "Info message written to memory!"
+    iologger.info(info_msg)
+    # WARN
+    warn_msg = "Warning message written to memory!"
+    iologger.warning(warn_msg)
+    # ERROR
+    err_msg = "Error message written to memory!"
+    iologger.error(err_msg)
+    # CRITICAL
+    crit_msg = "Critical message written to memory!"
+    iologger.critical(crit_msg)
+    # Tests
     iologger.log.seek(0)
-    assert msg in iologger.log.read()
+    log = iologger.log.read()
+    assert debug_msg in log
+    assert info_msg in log
+    assert warn_msg in log
+    assert err_msg in log
+    assert crit_msg in log

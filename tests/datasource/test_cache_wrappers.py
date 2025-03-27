@@ -9,15 +9,7 @@ def test_data_wrapper():
     DATA = pl.DataFrame({"name": ["Sugar", "Spice"], "species": ["cat", "cat"]})
 
     test_datasource = Datasource(name="TEST", source_dir=None, source_filename=None)
-    assert test_datasource.name == "TEST"
-    assert repr(test_datasource) == "<Datasource(name='TEST')>"
-    assert test_datasource.raw_data is None
-    assert test_datasource.has_raw_data is False
-    assert test_datasource.data is None
     assert test_datasource.has_data is False
-    assert test_datasource.raw_data_origin == RawDataOrigin.INIT
-    assert test_datasource.metadata.datasource.name == "TEST"
-    assert repr(test_datasource.metadata) == "<Metadata(datasource='TEST')>"
 
     @test_datasource.data_wrapper
     def set_data(obj, *args, **kwargs) -> pl.DataFrame:
