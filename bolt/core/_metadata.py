@@ -70,7 +70,13 @@ class Metadata:
     def to_json(self, json_indent: int = 0):
         d: dict = {}
         for k, v in self.__dict__.items():
-            if k in {"datasource", "options", "schema", "sources_hash, _sources_hash"}:
+            if k in {
+                "datasource",
+                "options",
+                "schema",
+                "sources_hash",
+                "_sources_hash",
+            }:
                 continue
             if type(v) in {set, tuple}:
                 v = list(v)

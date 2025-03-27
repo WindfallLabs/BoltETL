@@ -260,9 +260,7 @@ def update(
                     f"        [yellow]Error:   {failed[0]} ([i]ignored[/i])[/]"
                 )
             else:
-                console.print(
-                    f"        [red]Error:   {failed[0]}[/]"
-                )
+                console.print(f"        [red]Error:   {failed[0]}[/]")
         console.print()
 
     # Process datasources
@@ -276,9 +274,8 @@ def update(
         # Log to each Datasource's log
         for d in datasources:
             d.logger.info("============== Bolt-CMD ==============")
-            d.logger.info(f"Start ({d.name})")
+            d.logger.info(f"Started update for {d.name} (by {USER})")
             d.logger.info(f"Args: `--force={force} --download={download}`")
-            d.logger.info(f"Executed by {USER}")
 
             if d.name in ignore:
                 console.print(f"        [yellow]Skipped: {d.name} ([i]ignored[/i])[/]")
@@ -287,39 +284,21 @@ def update(
 
             do_update = True
 
-            # Try to hash and do recent update check
-            try:
-                db = WAREHOUSE.connect(False)
-
-                ## Hash (sha256) the source files
-                # TODO: hash the datasource / python file
-                # TODO: hash the data
-                if d.source_files:
-                    d.logger.info("Calculating hash")
-                    if not force:
-                        # Ignore update for datasources with no changes to the source files
-                        # Get the last hash (sha256) of the source files
-                        update_hash = db.sql(
-                            f"SELECT sources_hash FROM bolt_metadata WHERE table_name = '{d.name}'"
-                        ).pl()["sources_hash"]
-                        # Compare hashes and skip if they are the same
-                        if (
-                            not update_hash.is_empty()
-                            and d.metadata.sources_hash == update_hash.item()
-                        ):
-                            do_update = False
-            except Exception as e:
-                errors.append((d.name, e))
-            finally:
-                db.close()
+            # ----------------------------------------------------------------
+            # HASH
+            # Do recently updated check
+            do_update: bool = True
+            if not force:
+                d.logger.info("Comparing hashes")
+                do_update = WAREHOUSE.compare_hashes(d)
 
             if not do_update:
                 console.print(f"        [yellow]Skipped: {d.name} (unchanged)[/]")
-                d.logger.info(
-                    f"Update skipped (source files unchanged; {d.metadata.sources_hash})"
-                )
+                d.logger.info("Update skipped (source files unchanged)")
                 continue
 
+            # ----------------------------------------------------------------
+            # UPDATE
             try:
                 with console.status(f"[cyan]      Updating {d.name}...[/]"):
                     d.logger.info("Calling update command")
@@ -328,14 +307,14 @@ def update(
                     # TODO: handle misc post-load callbacks
                     # Confirm load success
                     if d.name not in WAREHOUSE.list_tables():
-                        d.logger.criticald("FAILURE: Table load could not be confirmed")
+                        d.logger.critical("FAILURE: Table load could not be confirmed")
                         raise duckdb.DataError(
                             "Table does not exist after attempting load"
                         )
                     d.logger.info("Table load confirmed")
                     console.print(f"        [green]Updated: {d.name}[/]")
                     d.logger.info("Update complete")
-                    # ========================================================
+                    WAREHOUSE.logger.info(f"Loaded {d.name}")
             except Exception as e:
                 d.logger.critical(f"{e}")
                 errors.append((d.name, e))
@@ -343,8 +322,8 @@ def update(
                 if not ignore_errors:
                     raise e
             finally:
-                db.close()
                 d.logger.info("End")
+            # ----------------------------------------------------------------
             tables_loaded += 1
         console.print(f"    Tables Loaded: {tables_loaded}")
         if ignore:

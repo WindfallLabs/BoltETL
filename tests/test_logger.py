@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from bolt import Datasource, Options
+from bolt import Datasource, Config
 from bolt.utils._logger import make_logger
 
 artifacts_path = Path(__file__).parent / "artifacts"
@@ -25,12 +25,11 @@ def log_file():
 
 def test_datasource_logger(log_file):
     assert not log_file.exists()
-    options = Options(log_dir=log_path)
+    Config.log_dir = log_path
     ds = Datasource(
         name=log_file.stem,
         source_dir=artifacts_path,
         source_filename="not-real.csv",
-        options=options,
     )
     msg = "I exist!"
     ds.logger.info(msg)

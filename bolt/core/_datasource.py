@@ -6,6 +6,7 @@ from logging import Logger
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+from .._config import Config
 from ..utils import IOLogger, make_logger
 from ._metadata import Metadata
 from ._options import Options
@@ -111,7 +112,7 @@ class Datasource[T]:
 
         # Logging setup
         self.logger: Logger | IOLogger = make_logger(
-            self._name, self.options.log_dir, self.options.log_format
+            self._name, Config.log_dir, self.options.log_format
         )
 
         # Data

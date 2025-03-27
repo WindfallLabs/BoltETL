@@ -15,6 +15,7 @@ class Config:
         env_path = Path(dotenv.dotenv_values(env_file)[_ENV_KEY])
     else:
         env_path = config_dir
+    log_dir: Path = env_path / "logs"
 
     @classmethod
     def init(cls, overwrite=False):

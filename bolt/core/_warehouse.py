@@ -1,6 +1,7 @@
 """DuckDB Data Warehouse"""
 
 from functools import wraps
+from logging import Logger
 from pathlib import Path
 from typing import Any, Callable, Generator, Literal
 from warnings import warn
@@ -9,6 +10,8 @@ import duckdb
 import polars as pl
 from graphlib import TopologicalSorter
 
+from .._config import Config
+from ..utils import IOLogger, make_logger
 from ._datasource import Datasource
 from ._report import Report
 from ._sql import SQL
@@ -51,6 +54,8 @@ class Warehouse[T]:
         self.duckdb_sql_return_method = duckdb_sql_return_method
 
         # Internal
+        # Logging setup
+        self.logger: Logger | IOLogger = make_logger("warehouse", Config.log_dir)
         self._is_new = not self.path.exists()  # BUG: can't use :memory:
         self._sql_functions: set[Callable] = set()
         self._scripts: list[str] = []
@@ -389,6 +394,38 @@ class Warehouse[T]:
         with self.connect() as con:
             df = con.sql(sql).pl()  # type: polars.DataFrame
         schema = list((table,) + tuple(i.values()) for i in df.to_dicts())
+
+    def compare_hashes(self, datasource):
+        """Compares the hashes of the parent datasource to determine if updated recently."""
+        # TODO: hash the datasource / python file
+        do_update = True
+        db = self.connect(False)
+        try:
+            if datasource.source_files:
+                datasource.logger.info("Calculating hash")
+                current_hash = datasource.metadata.sources_hash
+                # Ignore update for datasources with no changes to the source files
+                # Get the last hash (sha256) of the source files
+                db_hash = db.sql(
+                    f"SELECT sources_hash FROM bolt_metadata WHERE table_name = '{datasource.name}'"
+                ).pl()["sources_hash"]
+                # Compare hashes and skip if they are the same
+                if not db_hash.is_empty() and current_hash == db_hash.item():
+                    do_update = False
+                    datasource.logger.debug(
+                        f"Database hash (source files): {db_hash.item()}"
+                    )
+                    datasource.logger.debug(
+                        f"Current hash (source files): {current_hash}"
+                    )
+        except Exception as e:
+            datasource.logger.error(f"Comparing hashes failed: {e}")
+        finally:
+            db.close()
+
+        are = "are" if not do_update else "are not"
+        datasource.logger.info(f"Hashes {are} equal")
+        return do_update
 
     def list_tables(self, include_views=True) -> list[str]:
         # BUG: include_views=False throws error:
