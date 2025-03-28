@@ -2,13 +2,13 @@
 _Author: Garin Wally; 2024-12-09_  
 _Developed with love and support from the Missoula Urban Transit District_
 
-__NOTICE:__ This project is in active development. However, it is rapidly stabilizing
+__NOTICE:__ This project is in active development. However, it is rapidly stabilizing.
 
 ## Overview
 
 BoltETL is a lightweight, pure-Python data processing framework designed to support locally-executed workflows (both [ETL](https://en.wikipedia.org/wiki/Extract,_transform,_load) and ELT), reporting, and storage. Its main goal is to simplify the process of moving small- to medium-scale datasets from various sources into a local [DuckDB](https://duckdb.org/) data warehouse. BoltETL is ideal for solo data analysts or small teams who need to work with moderate volumes of data locally and without the complexity or cost of enterprise-grade orchestration systems.
 
-BoltETL is an excellent option for those who want to transition away from doing data processing in Jupyter Notebooks or for those who wish to add more structure and automation to their ad-hoc Python scripts.  
+BoltETL is an excellent option for those who want to transition away from doing data processing in Jupyter Notebooks or for those who wish to add more structure and automation to their ad-hoc Python scripts.
 
 BoltETL may compare to other projects, such as:
 - [Luigi](https://luigi.readthedocs.io/en/stable/)
@@ -19,14 +19,14 @@ BoltETL may compare to other projects, such as:
 
 ## Quick Start
 ### Installation
-Currently unavailable on PyPI.  
+Currently unavailable on PyPI.
 If you are unfamiliar with `git`, download this repository from the "Releases" page.
 ...
 
 
-### Define Your Datasources
+### Define the Datasources
 The `Datasource` is the key entry point into using the BoltETL framework. A Datasource could be a pile of Excel files, a response from an API, or even a statically defined DataFrame; BoltETL doesn't care. Datasources define how the data is retrieved (Extract), how it is manipulated or prepared (Transform), and how it gets entered into the data warehouse (Load). Each of these steps are executed in order, and are independent and isolated from other Datasources. Thus, there are no dependencies at this stage.  
-Let's have a look at an example:  
+Let's have a look at an example:
 
 __s_and_p.py__
 ```python
@@ -89,14 +89,22 @@ def set_data(obj, *args, **kwargs):
     return df  # return your data (becomes s_and_p_direct.data)
 
 ```
+### Define the Warehouse
+The `Warehouse` object is a wrapper object around the DuckDB data warehouse / file database. Additionally, it acts as the controller for SQL execution. Users can write post-load transformations (ELT) as SQL files that are loaded, sorted (by dependency), and executed by the `Warehouse` object.  
+
+```python
+# WIP
+```
 
 ### Call `bolt-cmd.py`
+The `bolt-cmd` CLI tool can run the `update` method on all your `Datasource` objects, and execute sorted SQL files.  
 
+`python bolt-cmd.py update .`
 
 ## Reports (WIP)
-BoltETL `Report` objects configure how data is exported from the data warehouse to output graphs, tables, and spreadsheets.  
+BoltETL `Report` objects configure how data is exported from the data warehouse to outputs such as graphs, tables, and spreadsheets.
 
-__Call with `bolt-cmd`:__  
+__Call with `bolt-cmd`:__
 ```cmd
 python bolt-cmd.py report run NoShowReport --start=2024-01-01 --end=2024-01-31
 ```
@@ -104,12 +112,12 @@ python bolt-cmd.py report run NoShowReport --start=2024-01-01 --end=2024-01-31
 
 ## Advanced Usage
 ### Environment Configuration (WIP)
-A BoltETL environment is simply a folder containing user-defined `Datasource`, `Report`, `Warehouse`, and SQL files.  
-BoltETL supports multiple environments using a simple [dotenv](https://github.com/theskumar/python-dotenv) file.  
+A BoltETL environment is simply a folder containing user-defined `Datasource`, `Report`, `Warehouse`, and SQL files.
+BoltETL supports multiple environments using a simple [dotenv](https://github.com/theskumar/python-dotenv) file.
 
 Say you are an independent contractor working for multiple agencies. You would likely wish to separate your projects by client:
 
-__Setup__  
+__Setup__
 ```python
 import bolt
 
@@ -117,8 +125,8 @@ bolt.Config.add_env("client1", r"C:\workspace\Client1", activate=True)  # Activa
 bolt.Config.add_env("client2", r"C:\workspace\Client2")
 ```
 
-This setup would set `bolt-cmd.py` to use the objects in the "Client1" path each time it's used.  
-To change it, use the following. Environments need to be activated each time you wish to swtich them.  
+This setup would set `bolt-cmd.py` to use the objects in the "Client1" path each time it's used.
+To change it, use the following. Environments need to be activated each time you wish to swtich them.
 
-__Set for use with `bolt-cmd`:__  
-`python bolt-cmd.py env activate client2`  
+__Set for use with `bolt-cmd`:__
+`python bolt-cmd.py env activate client2`
