@@ -27,6 +27,7 @@ logo = """┏━━┓━━━━━┏┓━━┏┓━┏━━━┓┏━�
 ┃┗━┛┃┃┗┛┃┃┗┓━┃┗┓┃┗━━┓━┏┛┗┓━┃┗━┛┃
 ┗━━━┛┗━━┛┗━┛━┗━┛┗━━━┛━┗━━┛━┗━━━┛"""
 
+ENV = bolt.Config.env_dir
 SCRIPT = Path(__file__).name
 WAREHOUSE: bolt.Warehouse = bolt.env.warehouse
 USER = f"{node()}/{getuser()}"
@@ -48,6 +49,50 @@ def time_diff(start: float, end: float) -> str:
 
 # ============================================================================
 # App Commands
+
+
+@app.command
+def env(
+    option: Literal["list", "add", "activate"] | None = None,
+    env_name: str = "",
+    *args,
+    **kwargs,
+):
+    """."""
+    if not option:
+        console.print()
+        return
+    # ------------------------------------------------------------------------
+    # LIST
+    if option.lower() == "list":
+        envs = bolt.Config.list_envs()
+        current = bolt.Config.env_dir
+        console.print("Available Environments:")
+        for env in envs:
+            if env[0] == "BOLT-ACTIVE":
+                continue
+            if str(env[1]) == str(current):
+                console.print(f"[green] -> {(env[0])}: {env[1]}[/]")
+            else:
+                console.print(f" -  {env[0]}: {env[1]}")
+    # ------------------------------------------------------------------------
+    # ADD
+    elif option.lower() == "add":
+        default = kwargs.get("default", False)
+        bolt.Config.add_env(env_name, kwargs["path"], default)
+        console.print(f"Added [green]{env_name}[/]")
+        if default:
+            console.print("[cyan](Set as default)[/]")
+    # ------------------------------------------------------------------------
+    # CHANGE
+    elif option.lower() == "activate":
+        # TODO: warn that env is already active
+        bolt.Config.activate_env(env_name)
+        console.print(
+            f"Activated environment: [green]{env_name} ({bolt.Config.env_dir})[/]"
+        )
+    console.print()
+    return
 
 
 @app.command
@@ -366,17 +411,17 @@ def update(
         console.print("\nErrors: [yellow i]ignored[/]")
     else:
         console.print(f"\nErrors: {err_cnt}")
-    for failed_ds, err in loading_errs:
-        console.print(
-            f"- [blue]{failed_ds}[/] (Datasource) [red]failed to import:[/]\n    [red b]{err}[/]"
-        )
-    for name, err in errors:
-        console.print(f"- [blue]{name}[/]: [red]{err}[/]")
-    # Report-loading errors
-    for rpt_name, err in bolt.Report.failed_to_load:
-        console.print(
-            f"- [blue]{rpt_name}[/] (Report) [red]failed to import:[/]\n    [red b]{err}[/]"
-        )
+        for failed_ds, err in loading_errs:
+            console.print(
+                f"- [blue]{failed_ds}[/] (Datasource) [red]failed to import:[/]\n    [red b]{err}[/]"
+            )
+        for name, err in errors:
+            console.print(f"- [blue]{name}[/]: [red]{err}[/]")
+        # Report-loading errors
+        for rpt_name, err in bolt.Report.failed_to_load:
+            console.print(
+                f"- [blue]{rpt_name}[/] (Report) [red]failed to import:[/]\n    [red b]{err}[/]"
+            )
     return
 
 
@@ -384,9 +429,10 @@ t_init_end = time.perf_counter_ns()
 
 if __name__ == "__main__":
     try:
+        t_start = time.perf_counter_ns()
         # Initial blank line and app info
         console.print(f"\nBoltCMD ([b blue]v{__version__}[/])")
-        t_start = time.perf_counter_ns()
+        console.print(f"Active Env: {bolt.Config.env_dir}")
         app()
     except Exception:
         console.print_exception()

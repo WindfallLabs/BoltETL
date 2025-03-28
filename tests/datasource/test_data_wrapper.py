@@ -8,7 +8,7 @@ def test_data_wrapper():
     Config.log_dir = None
     DATA = pl.DataFrame({"name": ["Sugar", "Spice"], "species": ["cat", "cat"]})
 
-    test_datasource = Datasource(name="TEST", source_dir=None, source_filename=None)
+    test_datasource = Datasource(name="TEST")
     assert test_datasource.name == "TEST"
     assert repr(test_datasource) == "<Datasource(name='TEST')>"
     assert test_datasource.raw_data is None

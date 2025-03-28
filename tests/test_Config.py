@@ -21,12 +21,12 @@ def test_init(cfg):
     assert cfg.config_dir.exists()
     assert cfg.env_file.exists()
     content = cfg.env_file.open().read()
-    assert f"BOLT-ENV={str(cfg.config_dir)}" in content
+    assert f"BOLT-ACTIVE={str(cfg.config_dir)}" in content
 
 
 def test_add_env(cfg):
     cfg.init()
-    cfg.add_env("TEST1", Path(__file__).parent / "artifacts", set_default=True)
+    cfg.add_env("TEST1", Path(__file__).parent / "artifacts", activate=True)
     cfg.add_env("TEST2", str(Path(__file__).parent / "artifacts"))  # string
     content = cfg.env_file.open().read()
     assert re.findall(r"TEST1=(.*?)\\artifacts", content)
@@ -37,7 +37,7 @@ def test_add_env(cfg):
 
 def test_use_env(cfg):
     cfg.init()
-    cfg.add_env("TEST", Path(__file__).parent / "artifacts", set_default=True)
+    cfg.add_env("TEST", Path(__file__).parent / "artifacts", activate=True)
     cfg.use_env("TEST")
     assert "artifacts" in str(cfg.env_dir)
 
@@ -45,7 +45,7 @@ def test_use_env(cfg):
 def test_reserved_keyword(cfg):
     cfg.init()
     with pytest.raises(KeyError):
-        cfg.add_env("BOLT-ENV", "...")
+        cfg.add_env("BOLT-ACTIVE", "...")
 
 
 def test_get_default(cfg):

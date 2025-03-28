@@ -71,8 +71,8 @@ class Datasource[T]:
     def __init__(
         self,
         name: str,
-        source_dir: Path,
-        source_filename: str,
+        source_dir: Path | None = None,
+        source_filename: str | None = None,
         metadata: Metadata | None = None,
         options: Options | None = None,
     ):
@@ -205,11 +205,23 @@ class Datasource[T]:
         The function that this decorator wraps must have the following arguments:
 
         Args:
-            source_files (list[Path]): A list of Path objects for each raw data file
-            logger (logging.Logger|NullLogger): optionally log messages to file
+            obj (self): A reference to the object/self
 
         Returns:
             raw_data (Any): Extracted data (probably a DataFrame)
+
+        Example:
+            ```python
+            import polars as pl
+            from bolt import Datasource
+
+            test_datasource = Datasource(name="TEST")
+
+            @test_datasource.extract_wrapper
+            def extract(obj, *args, **kwargs) -> pl.DataFrame:
+                data = pl.DataFrame({"name": ["Sugar", "Spice"], "species": ["cat", "cat"]})
+                return data
+            ```
         """
 
         @wraps(extract_func)
@@ -233,12 +245,31 @@ class Datasource[T]:
         The function that this decorator wraps must have the following arguments:
 
         Args:
-            raw (Any): The raw data that was defined in the `extract` method
-            metadata (Metadata): Metadata object for the Datasource
-            logger (Logger): A file-logger for logging
+            obj (self): A reference to the object/self
 
         Returns:
             data (Any): Processed data (probably a DataFrame)
+
+        Example:
+            ```python
+            import polars as pl
+            from bolt import Datasource
+
+            test_datasource = Datasource(name="TEST")
+
+            @test_datasource.extract_wrapper
+            def extract(obj, *args, **kwargs) -> pl.DataFrame:
+                data = pl.DataFrame({"name": ["Sugar", "Spice"], "species": ["cat", "cat"]})
+                return data
+
+            @test_datasource.transform_wrapper
+            def transform(obj, *args, **kwargs) -> pl.DataFrame:
+                transformed_data = obj.raw_data.with_columns(
+                    pl.col("species").str.to_uppercase()
+                )
+                return transformed_data
+
+            ```
         """
 
         @wraps(transform_func)
@@ -260,7 +291,7 @@ class Datasource[T]:
         The function that this decorator wraps must have the following arguments:
 
         Args:
-            self (T): The Datasource object; use "obj" as argument name
+            obj (self): A reference to the object/self
             warehouse (Warehouse): The user-defined warehouse
 
         Returns:
@@ -277,6 +308,46 @@ class Datasource[T]:
             return
 
         self.load = _load_wrapper
+        return
+
+    def data_wrapper(self, data_func: Callable) -> Callable:  # TODO:
+        """
+        Decorator that allows users to bypass `extract` and `transform` methods
+        and set the Datasource's `.data` attribute directly.
+
+        The function that this decorator wraps must have the following arguments:
+
+        Args:
+            obj (self): A reference to the object/self
+
+        Returns:
+            data (Any): Processed data (probably a DataFrame)
+
+        Example:
+            ```python
+            import polars as pl
+            from bolt import Datasource
+
+            test_datasource = Datasource(name="TEST")
+
+
+            @test_datasource.data_wrapper
+            def set_data(obj, *args, **kwargs) -> pl.DataFrame:
+                data = pl.DataFrame({"name": ["Sugar", "Spice"], "species": ["cat", "cat"]})
+                return data
+            ```
+        """
+
+        @wraps(data_func)
+        def _data_wrapper(*args, **kwargs):
+            data = data_func(self)
+            self._raw_data = data  # TODO: or should raw be None?
+            self._data = data
+            return
+
+        self.extract = _data_wrapper
+        self.state = ETLState.TRANSFORMED
+        self.raw_data_origin = RawDataOrigin.DIRECTLY_SET
         return
 
     def cache_write_wrapper(self, cache_write_func: Callable) -> Callable:
@@ -331,31 +402,6 @@ class Datasource[T]:
             return
 
         self.cache_read = _cache_read_wrapper
-        return
-
-    def data_wrapper(self, data_func: Callable) -> Callable:  # TODO:
-        """
-        Decorator that allows users to bypass `extract` and `transform` methods.
-
-        The function that this decorator wraps must have the following arguments:
-
-        Args:
-            data (Any): The data to set
-
-        Returns:
-            None
-        """
-
-        @wraps(data_func)
-        def _data_wrapper(*args, **kwargs):
-            data = data_func(self)
-            self._raw_data = data  # TODO: or should raw be None?
-            self._data = data
-            return
-
-        self.extract = _data_wrapper
-        self.state = ETLState.TRANSFORMED
-        self.raw_data_origin = RawDataOrigin.DIRECTLY_SET
         return
 
     def validate_wrapper(self, validate_func: Callable) -> Callable:
