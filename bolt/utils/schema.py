@@ -1,12 +1,70 @@
 """Functions related to dataframe schemas."""
 
 from typing import Literal
+from warnings import deprecated
 
 import pandas as pd
 import polars as pl
 from dateutil.parser import parse as parse_date
 
 
+def conform(
+    df: pl.DataFrame,
+    schema: tuple[tuple[str, pl.DataType]]
+) -> pl.DataFrame:
+    """Adds, sorts, and casts columns of a dataframe to match a given schema."""
+    orig_schema = dict(zip(df.columns, df.dtypes))
+    ldf = df.lazy()
+    target = pl.DataFrame(schema=schema)
+    exprs = []
+
+    for i in schema:
+        if i[0] in orig_schema.keys():
+            orig_dtype = orig_schema[i[0]]
+            try:
+                orig_dtype_name = orig_dtype.__name__     
+            except AttributeError:
+                orig_dtype_name = orig_dtype.__class__.__name__
+            # Handle Date types
+            if i[1] in (pl.Date, pl.Datetime, pl.Time) and orig_dtype == pl.String:
+                expr = pl.col(i[0]).str.strptime(format=None, dtype=i[1], strict=False, ambiguous="null")
+
+            elif i[1] == pl.Duration:
+                # Durations must be parsed using pandas.to_timedelta, and converted back to pl.Series
+                expr = pl.Series(
+                    # Polars expects 'us', pandas returns 'ns'
+                    pd.to_timedelta(df.to_pandas()[i[0]])
+                ).cast(i[1])
+
+            elif i[1].is_float() or i[1].is_integer():
+                expr = pl.col(i[0]).cast(i[1], wrap_numerical=True)
+
+            elif i[1] == pl.Boolean and orig_dtype == pl.String:
+                expr = (
+                    pl.col(i[0]).str.to_lowercase()
+                    .replace("false", 0)
+                    .replace("true", 1)
+                    .cast(pl.Int8)
+                    .cast(pl.Boolean)
+                )
+
+            else:
+                expr = pl.col(i[0]).cast(i[1])
+        else:
+            # Field is not in dataframe, add and set to Null
+            expr = pl.lit(None).cast(i[1]).alias(i[0])
+        exprs.append(expr)
+
+    return pl.concat(
+        [
+            target,
+            ldf.with_columns(exprs).collect()
+        ],
+        how="align_full"
+    )
+
+
+@deprecated("Use `conform` instead")
 def enforce(
     df: pl.DataFrame,
     schema: tuple[tuple[str, pl.DataType]],

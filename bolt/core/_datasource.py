@@ -4,10 +4,11 @@ from enum import Enum
 from functools import wraps
 from logging import Logger
 from pathlib import Path
+from time import perf_counter_ns
 from typing import Any, Callable, Optional
 
 from .._config import Config
-from ..utils import IOLogger, make_logger
+from ..utils import IOLogger, make_logger, time_diff
 from ._metadata import Metadata
 from ._options import Options
 
@@ -110,6 +111,9 @@ class Datasource[T]:
         # State
         self.state = ETLState.INIT
         self.raw_data_origin = RawDataOrigin.INIT
+        self._extract_time: tuple[float, float]|None = None
+        self._transform_time: tuple[float, float]|None = None
+        self._load_time: tuple[float, float]|None = None
 
         # Processing attributes
         self.extract: Optional[Callable] = None
@@ -195,6 +199,27 @@ class Datasource[T]:
         """Whether or not transformed data exists on-disk."""
         return self.options.cache_path and self.options.cache_path.exists()
 
+    @property
+    def extract_time(self):
+        """The run time of the extract function."""
+        if self._extract_time:
+            return time_diff(*self._extract_time)
+        return "-1"
+
+    @property
+    def transform_time(self):
+        """The run time of the transform function."""
+        if self._transform_time:
+            return time_diff(*self._transform_time)
+        return "-1"
+
+    @property
+    def load_time(self):
+        """The run time of the load function."""
+        if self._load_time:
+            return time_diff(*self._load_time)
+        return "-1"
+
     # ========================================================================
     # Wrapper methods
 
@@ -226,10 +251,12 @@ class Datasource[T]:
 
         @wraps(extract_func)
         def _extract_wrapper(*args, **kwargs):
+            _start = perf_counter_ns()
             extracted_data = extract_func(self)
             self._raw_data = extracted_data
+            self._extract_time = (_start, perf_counter_ns())
             self.state = ETLState.EXTRACTED
-            self.logger.info("Extracted")
+            self.logger.info(f"Extracted (in {self.extract_time})")
             self.logger.info(f"- type={type(self._raw_data)}")
             self.logger.info(f"- len={len(self._raw_data)}")
             return
@@ -274,9 +301,11 @@ class Datasource[T]:
 
         @wraps(transform_func)
         def _transform_wrapper(*args, **kwargs):
+            _start = perf_counter_ns()
             self._data = transform_func(self)
+            self._transform_time = (_start, perf_counter_ns())
             self.state = ETLState.TRANSFORMED
-            self.logger.info("Transformed")
+            self.logger.info(f"Transformed (in {self.transform_time})")
             self.logger.info(f"- type={type(self._data)}")
             self.logger.info(f"- len={len(self._data)}")
             return
@@ -301,7 +330,10 @@ class Datasource[T]:
 
         @wraps(load_func)
         def _load_wrapper(warehouse: Warehouse, *args, **kwargs):
+            _start = perf_counter_ns()
             load_func(self, warehouse)
+            self._load_time = (_start, perf_counter_ns())
+            self.logger.info(f"Loaded (in {self.load_time})")
             self.state = ETLState.LOADED
             self.metadata._insert(warehouse)
             self.logger.info("Metadata inserted")
@@ -433,12 +465,15 @@ class Datasource[T]:
         # Default data loader
         self.logger.info("Loading data (with default loader)")
         try:
+            _start = perf_counter_ns()
             df = self.data  # noqa: F841
             with warehouse.connect() as con:
                 con.sql(f"CREATE OR REPLACE TABLE {self.name} AS SELECT * FROM df")
+            self._load_time = (_start, perf_counter_ns())
         except Exception as e:
             self.logger.critical("FAILED to load (with default loader)")
             raise e
+        self.logger.info(f"Loaded (in {self.load_time})")
         self.metadata._insert(warehouse)
         self.logger.info("Metadata inserted")
         return

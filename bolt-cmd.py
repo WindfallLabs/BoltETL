@@ -14,6 +14,7 @@ from rich.console import Console  # noqa: E402
 
 import bolt  # noqa: E402
 import bolt.env  # noqa: E402
+from bolt.utils import time_diff  # noqa: E402
 
 __version__ = bolt.__version__
 
@@ -31,20 +32,6 @@ ENV = bolt.Config.env_dir
 SCRIPT = Path(__file__).name
 WAREHOUSE: bolt.Warehouse = bolt.env.warehouse
 USER = f"{node()}/{getuser()}"
-
-
-# ============================================================================
-# Utility Functions
-
-
-def time_diff(start: float, end: float) -> str:
-    """Calculates the minutes and seconds difference between two timestamps (floats)."""
-    ms = (end - start) / 1000
-    tot_secs = dt.timedelta(microseconds=ms).total_seconds()
-    min = int(tot_secs // 60)
-    sec = tot_secs % 60
-    t_msg = f"{min}:{sec:.2f}"
-    return t_msg
 
 
 # ============================================================================
@@ -357,7 +344,7 @@ def update(
                             "Table does not exist after attempting load"
                         )
                     d.logger.info("Table load confirmed")
-                    console.print(f"        [green]Updated: {d.name}[/]")
+                    console.print(f"        [green]Updated: {d.name}[/]  [blue](E:{d.extract_time} T:{d.transform_time} L:{d.load_time})[/]")
                     d.logger.info("Update complete")
                     WAREHOUSE.logger.info(f"Loaded {d.name}")
             except Exception as e:
