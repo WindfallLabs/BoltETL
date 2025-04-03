@@ -3,32 +3,66 @@
 from typing import Literal
 from warnings import deprecated
 
-import pandas as pd
-import polars as pl
-from dateutil.parser import parse as parse_date
+import pandas as pd  # type: ignore[import-untyped]
+import polars as pl  # type: ignore[import-untyped]
+from dateutil.parser import parse as parse_date  # type: ignore[import-untyped]
+from polars.datatypes.classes import DataTypeClass, TemporalType
 
 
 def conform(
     df: pl.DataFrame,
-    schema: tuple[tuple[str, pl.DataType]]
+    schema: tuple[tuple[str, DataTypeClass]] | tuple[tuple[str, DataTypeClass, str]],
 ) -> pl.DataFrame:
-    """Adds, sorts, and casts columns of a dataframe to match a given schema."""
+    """Adds, sorts, and casts columns of a dataframe to match a given schema.
+    Explicitly supports casting for:
+        pl.Bool     <- pl.String
+        pl.Datetime <- pl.String
+        pl.Date     <- pl.String
+        pl.Time     <- pl.String
+        pl.Duration <- Any
+        pl.Int*     <- pl.String
+        pl.Float*   <- pl.String
+    """
     orig_schema = dict(zip(df.columns, df.dtypes))
     ldf = df.lazy()
-    target = pl.DataFrame(schema=schema)
-    exprs = []
+    target = pl.LazyFrame(schema=[(i[0], i[1]) for i in schema])
+    exprs: list[pl.Expr | pl.Series] = []
 
+    schema_cols = {i[0] for i in schema}
+    df_cols = {col for col in orig_schema.keys()}
+    missing = df_cols.difference(schema_cols)
+    if len(missing) > 0:
+        raise pl.exceptions.SchemaError(
+            f"DataFrame has columns not defined by schema: {missing}"
+        )
+
+    i: tuple[str, DataTypeClass] | tuple[str, DataTypeClass, str]
+    expr: pl.Expr | pl.Series
     for i in schema:
+        dt_fmt: str | None = None
+        if len(i) > 2:
+            dt_fmt = i[2]
+        # Explicitly drop columns by setting the cast type to None
+        if not i[1]:
+            ldf = ldf.drop(i[0])
+            target = target.drop(i[0])
+            continue
+
         if i[0] in orig_schema.keys():
             orig_dtype = orig_schema[i[0]]
-            try:
-                orig_dtype_name = orig_dtype.__name__     
-            except AttributeError:
-                orig_dtype_name = orig_dtype.__class__.__name__
-            # Handle Date types
-            if i[1] in (pl.Date, pl.Datetime, pl.Time) and orig_dtype == pl.String:
-                expr = pl.col(i[0]).str.strptime(format=None, dtype=i[1], strict=False, ambiguous="null")
 
+            # String -> Date, Datetime, Time types
+            # if orig_dtype == pl.String and i[1] in (pl.Date, pl.Datetime, pl.Time):
+            if (
+                orig_dtype == pl.String
+                and issubclass(i[1], TemporalType)
+                and i[1] != pl.Duration
+            ):
+                expr = pl.col(i[0]).str.strptime(
+                    format=dt_fmt, dtype=i[1], strict=False, ambiguous="null"
+                )
+
+            # Duration type
             elif i[1] == pl.Duration:
                 # Durations must be parsed using pandas.to_timedelta, and converted back to pl.Series
                 expr = pl.Series(
@@ -36,18 +70,22 @@ def conform(
                     pd.to_timedelta(df.to_pandas()[i[0]])
                 ).cast(i[1])
 
+            # Numeric types
             elif i[1].is_float() or i[1].is_integer():
                 expr = pl.col(i[0]).cast(i[1], wrap_numerical=True)
 
-            elif i[1] == pl.Boolean and orig_dtype == pl.String:
+            # String -> boolean
+            elif orig_dtype == pl.String and i[1] == pl.Boolean:
                 expr = (
-                    pl.col(i[0]).str.to_lowercase()
+                    pl.col(i[0])
+                    .str.to_lowercase()
                     .replace("false", 0)
                     .replace("true", 1)
                     .cast(pl.Int8)
                     .cast(pl.Boolean)
                 )
 
+            # Last resort
             else:
                 expr = pl.col(i[0]).cast(i[1])
         else:
@@ -55,19 +93,16 @@ def conform(
             expr = pl.lit(None).cast(i[1]).alias(i[0])
         exprs.append(expr)
 
-    return pl.concat(
-        [
-            target,
-            ldf.with_columns(exprs).collect()
-        ],
-        how="align_full"
-    )
+    ldf = ldf.with_columns(exprs)
+
+    ldf = pl.concat([target, ldf], how="align_full")
+    return ldf.collect()
 
 
 @deprecated("Use `conform` instead")
 def enforce(
     df: pl.DataFrame,
-    schema: tuple[tuple[str, pl.DataType]],
+    schema: tuple[tuple[str, DataTypeClass]],
     sort=True,
     handle_missing: Literal["add", "ignore", "raise"] = "raise",
     parse_dates=False,
@@ -79,7 +114,7 @@ def enforce(
     ----------
     df : pl.DataFrame
         The dataframe to apply dtypes.
-    schema : tuple[tuple[str, pl.DataType]]
+    schema : tuple[tuple[str, DataTypeClass]]
         A tuple of (column_name, datatype) that defines the columns and dtypes for the resulting dataframe.
         It is assumed that the schema is a complete, or over-complete representation of the dataframe; thus
           columns in the dataframe not specified by the schema will be dropped.
@@ -103,15 +138,16 @@ def enforce(
 
     """
     # Expressions to execute in `df.with_columns`
-    expressions = []
+    expressions: list[pl.Expr | pl.Series] = []
     # Final cols to keep (sorted)
     select_columns = []
     for col, dtype in schema:
         # Get dtype name (str)
+        dtype_name: str
         try:
-            dtype_name: str = dtype.__name__
+            dtype_name = dtype.__name__
         except AttributeError:
-            dtype_name: str = dtype.__class__.__name__
+            dtype_name = dtype.__class__.__name__
 
         # Handle missing columns
         if col not in df.columns:
@@ -247,7 +283,7 @@ def validate(
     schema: tuple[tuple[str, pl.DataType]],
     sort=True,
     drop_nonetypes=True,
-) -> None:
+) -> pl.DataFrame:
     """Asserts that dataframe schema and expected schema are equal."""
     expected = set(schema)
     # Drop schema items where the dtype is None

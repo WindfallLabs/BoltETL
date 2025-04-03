@@ -2,6 +2,7 @@
 
 import re
 from pathlib import Path
+from typing import Self
 
 from bolt.core._options import Options
 
@@ -10,12 +11,12 @@ REGEX = re.compile(r"(?:FROM|JOIN|UPDATE|INSERT INTO|PIVOT) (\b\w+\b)")
 IGNORE_REGEX = re.compile(r"(\w+)\s+?\bAS\b")
 
 
-class SQL[T]:
-    registry: dict[str, T] = dict()
+class SQL:
+    registry: dict[str, Self] = dict()
     failed_to_load: set[tuple[str, Exception]] = set()
 
     def __init__(
-        self,
+        self: Self,
         name: str | None = None,
         ttype: str | None = None,  # TODO: require? useful?
         path: Path | None = None,
@@ -45,7 +46,7 @@ class SQL[T]:
         self.registry[self.name] = self
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._name
 
     @property
@@ -53,7 +54,7 @@ class SQL[T]:
         return self._path
 
     @property
-    def sql(self):
+    def sql(self) -> str:
         if self.path:
             content = self.path.open().read()
         else:
@@ -76,10 +77,10 @@ class SQL[T]:
         }
         return deps
 
-    def _set_warehouse(self, warehouse) -> T:
+    def _set_warehouse(self, warehouse) -> Self:
         """Sets the warehouse attribute."""
         self.warehouse = warehouse
         return self
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<SQL(name='{self._name}')>"

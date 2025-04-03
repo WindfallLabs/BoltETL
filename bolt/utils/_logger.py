@@ -40,7 +40,7 @@ class IOLogger(logging.Logger):
 
     def __init__(self, name: str, formatter: logging.Formatter, level=logging.DEBUG):
         super().__init__(name, level)
-        self.log = StringIO()
+        self.log = StringIO()  # type: ignore
         self.formatter = formatter
 
     def makeRecord(

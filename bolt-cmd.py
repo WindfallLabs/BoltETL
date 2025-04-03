@@ -34,6 +34,18 @@ WAREHOUSE: bolt.Warehouse = bolt.env.warehouse
 USER = f"{node()}/{getuser()}"
 
 
+# @cyclopts.Parameter(name="*")
+# @dataclass
+# class Common:
+#     quiet: bool = False
+
+#     #def __post_init__(self):
+#     def set_quiet(self):
+#         if self.quiet:
+#             global console
+#             console.quiet = True
+#         return
+
 # ============================================================================
 # App Commands
 
@@ -42,6 +54,7 @@ USER = f"{node()}/{getuser()}"
 def env(
     option: Literal["list", "add", "activate"] | None = None,
     env_name: str = "",
+    # common: Common|None = Common(),
     *args,
     **kwargs,
 ):
@@ -247,6 +260,7 @@ def update(
     skip_db=False,
     ignore_errors=False,
     download=True,
+    quiet=False,
 ):
     """Updates datasource by name, or all configured datasources ('.').
 
@@ -260,6 +274,9 @@ def update(
         `python bolt-cmd.py update db`  # updates only the database
         `python bolt-cmd.py update <datasource>`  # updates <datasource>
     """
+    if quiet:
+        console.print("[black b]Updating...[/]")
+        console.quiet = True
     bolt.env.datasources.load_all()
     if not ignore:
         ignore = []
@@ -344,7 +361,9 @@ def update(
                             "Table does not exist after attempting load"
                         )
                     d.logger.info("Table load confirmed")
-                    console.print(f"        [green]Updated: {d.name}[/]  [blue](E:{d.extract_time} T:{d.transform_time} L:{d.load_time})[/]")
+                    console.print(
+                        f"        [green]Updated: {d.name}[/]  [blue](E:{d.extract_time} T:{d.transform_time} L:{d.load_time})[/]"
+                    )
                     d.logger.info("Update complete")
                     WAREHOUSE.logger.info(f"Loaded {d.name}")
             except Exception as e:
@@ -418,8 +437,11 @@ if __name__ == "__main__":
     try:
         t_start = time.perf_counter_ns()
         # Initial blank line and app info
-        console.print(f"\nBoltCMD ([b blue]v{__version__}[/])")
-        console.print(f"Active Env: {bolt.Config.env_dir}")
+        # console.print(f"\nBoltCMD ([b blue]v{__version__}[/])")
+        console.print(
+            f"\nBoltCMD ([b blue]v{__version__}[/]) [green]"
+            rf"\[{bolt.Config.get_env_name()}][/]"
+        )
         app()
     except Exception:
         console.print_exception()

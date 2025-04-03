@@ -4,7 +4,7 @@ from urllib.request import urlopen
 from zipfile import ZipFile
 
 
-def memory_unzip(payload) -> list[tuple[str, bytes]]:
+def memory_unzip(payload) -> list[tuple[str, bytes]] | list[tuple[str, list[bytes]]]:
     """Unzip the contents of a payload, preserving directory structure."""
     unzipped_payload: list[tuple[str, bytes]] = []
     with ZipFile(BytesIO(payload), "r") as zf:
@@ -26,12 +26,12 @@ def download(url: str, out_dir: Path, unzip=True):
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Get the payload to download
-    payload: bytes = urlopen(url).read()
+    payload: list[bytes] = urlopen(url).read()
 
     # Determine if the payload should be unzipped (in-memory)
     if unzip and url.endswith(".zip"):
         # Unzip the payload in-memory
-        payload: list[bytes] = memory_unzip(payload)
+        payload: list[bytes] = memory_unzip(payload)  # type: ignore[no-redef]
 
     if isinstance(payload, list):
         for filename, file_content in payload:

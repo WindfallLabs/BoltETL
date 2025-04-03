@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-import pandas as pd
+import pandas as pd  # type: ignore[import-untyped]
 import polars as pl
 
 
@@ -27,7 +27,7 @@ def dict_to_sheets(
         for sheet_name, dataframe in data.items():
             if not isinstance(dataframe, pd.DataFrame):
                 if isinstance(dataframe, pl.DataFrame):
-                    dataframe: pd.DataFrame = dataframe.to_pandas()
+                    dataframe = dataframe.to_pandas()
                 else:
                     raise ValueError(
                         f"Expected pd.DataFrame for '{sheet_name}', got {dataframe}"

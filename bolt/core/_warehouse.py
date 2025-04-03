@@ -245,7 +245,9 @@ class Warehouse[T]:
         script_dependencies = {}
         for name, obj in self.sql_registry.items():
             clean_deps = set()
-            deps = {d for d in obj.dependencies if d not in self.ignored_dependencies}
+            deps: set[str] = {
+                d for d in obj.dependencies if d not in self.ignored_dependencies
+            }
             for dep in deps:
                 if dep in self.ignored_dependencies:
                     continue
@@ -256,15 +258,17 @@ class Warehouse[T]:
                 clean_deps.add(dep)
             script_dependencies[name] = clean_deps
         sorter = TopologicalSorter(script_dependencies)
-        sorted_graph = tuple(sorter.static_order())
+        sorted_graph: tuple[str] = tuple(sorter.static_order())
         if small:
             return sorted_graph
 
-        full_graph: list[tuple[str, type]] = []
+        full_graph: list[tuple[str, str, set[str]]] = []
+        g: str
         for g in sorted_graph:
             # Get from SQL registry or Datasource registry
             obj = self.sql_registry.get(g, self.datasource_registry.get(g, None))
-            deps: set[str] = getattr(obj, "dependencies", set())
+            deps = getattr(obj, "dependencies", set())
+            t: str
             if obj is None:
                 t = "MISSING"
             else:
@@ -339,7 +343,7 @@ class Warehouse[T]:
                 df = pl.from_pandas(df)
         return df
 
-    def get_table_schema(  # TODO: broken? re-enable in bolt-cmd
+    def get_table_schema(  # type: ignore[return]
         self,
         table: str,
         dialect: Literal["duckdb", "arrow", "polars", "pandas", "numpy"] = "polars",
@@ -358,7 +362,11 @@ class Warehouse[T]:
 
             # Arrow
             if dialect == "arrow":
-                df_sch = tbl.to_arrow_table().schema  # type: pyarrow.lib.Schema
+                from pyarrow.lib import (  # type: ignore[import-untyped]
+                    Schema as PyArrowSchema,
+                )
+
+                df_sch: PyArrowSchema = tbl.to_arrow_table().schema
                 schema = list(
                     zip(
                         (table,) * len(df_sch.names),
@@ -370,7 +378,7 @@ class Warehouse[T]:
 
             # Polars
             elif dialect == "polars":
-                df = tbl.pl()  # type: polars.DataFrame
+                df: pl.DataFrame = tbl.pl()  # type: ignore[no-redef]
                 schema = list(
                     zip(
                         (table,) * len(df.columns),
@@ -382,8 +390,10 @@ class Warehouse[T]:
 
             # Numpy / Pandas
             elif dialect == "numpy" or dialect == "pandas":
+                import pandas as pd  # type: ignore[import-untyped]
+
                 with self.connect() as con:
-                    df = tbl.df().dtypes.reset_index()  # type: pandas.DataFrame
+                    df: pd.DataFrame = tbl.df().dtypes.reset_index()  # type: ignore[no-redef]
                 schema = list(
                     zip((table,) * len(df), df["index"], [i.name for i in df[0]])
                 )
@@ -392,7 +402,7 @@ class Warehouse[T]:
         # DuckDB
         sql = f"SELECT column_name, column_type FROM (DESCRIBE {table});"
         with self.connect() as con:
-            df = con.sql(sql).pl()  # type: polars.DataFrame
+            df: pl.DataFrame = con.sql(sql).pl()  # type: ignore[no-redef]
         schema = list((table,) + tuple(i.values()) for i in df.to_dicts())
 
     def compare_hashes(self, datasource):

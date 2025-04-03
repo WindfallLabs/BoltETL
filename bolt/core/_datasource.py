@@ -5,7 +5,7 @@ from functools import wraps
 from logging import Logger
 from pathlib import Path
 from time import perf_counter_ns
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Self
 
 from .._config import Config
 from ..utils import IOLogger, make_logger, time_diff
@@ -63,17 +63,17 @@ class ETLState(Enum):
         return this >= oth
 
 
-class Datasource[T]:
+class Datasource:
     """."""
 
-    registry: dict[str, T] = dict()
+    registry: dict[str, Self] = dict()
     failed_to_load: set[tuple[str, Exception]] = set()
 
     def __init__(
-        self,
+        self: Self,
         name: str,
-        source_dir: Path | None = None,
-        source_filename: str | None = None,
+        source_dir: Path | str = "",
+        source_filename: str = "",
         metadata: Metadata | None = None,
         options: Options | None = None,
     ):
@@ -111,9 +111,9 @@ class Datasource[T]:
         # State
         self.state = ETLState.INIT
         self.raw_data_origin = RawDataOrigin.INIT
-        self._extract_time: tuple[float, float]|None = None
-        self._transform_time: tuple[float, float]|None = None
-        self._load_time: tuple[float, float]|None = None
+        self._extract_time: tuple[float, float] | None = None
+        self._transform_time: tuple[float, float] | None = None
+        self._load_time: tuple[float, float] | None = None
 
         # Processing attributes
         self.extract: Optional[Callable] = None
@@ -155,7 +155,11 @@ class Datasource[T]:
     def data(self) -> Optional[Any]:
         """Processed data (transformed, set directly, or read from cache)."""
         # Call extract automatically when DIRECTLY_SET
-        if self._data is None and self.raw_data_origin == RawDataOrigin.DIRECTLY_SET:
+        if (
+            self.extract
+            and self._data is None
+            and self.raw_data_origin == RawDataOrigin.DIRECTLY_SET
+        ):
             self.extract()
         return self._data
 
@@ -223,7 +227,7 @@ class Datasource[T]:
     # ========================================================================
     # Wrapper methods
 
-    def extract_wrapper(self, extract_func: Callable) -> Callable:
+    def extract_wrapper(self, extract_func: Callable) -> None:
         """
         Decorator to register the class's `extract` method.
 
@@ -250,7 +254,7 @@ class Datasource[T]:
         """
 
         @wraps(extract_func)
-        def _extract_wrapper(*args, **kwargs):
+        def _extract_wrapper(*args, **kwargs) -> None:
             _start = perf_counter_ns()
             extracted_data = extract_func(self)
             self._raw_data = extracted_data
@@ -265,7 +269,7 @@ class Datasource[T]:
         self.raw_data_origin = RawDataOrigin.EXTRACTED
         return
 
-    def transform_wrapper(self, transform_func: Callable) -> Callable:
+    def transform_wrapper(self, transform_func: Callable) -> None:
         """
         Decorator to register the class's `transform` method.
 
@@ -300,7 +304,7 @@ class Datasource[T]:
         """
 
         @wraps(transform_func)
-        def _transform_wrapper(*args, **kwargs):
+        def _transform_wrapper(*args, **kwargs) -> None:
             _start = perf_counter_ns()
             self._data = transform_func(self)
             self._transform_time = (_start, perf_counter_ns())
@@ -313,7 +317,7 @@ class Datasource[T]:
         self.transform = _transform_wrapper
         return
 
-    def load_wrapper(self, load_func: Callable) -> Callable:
+    def load_wrapper(self, load_func: Callable) -> None:
         """
         Decorator to register the class's `load` method.
 
@@ -329,7 +333,7 @@ class Datasource[T]:
         from bolt.core._warehouse import Warehouse  # noqa
 
         @wraps(load_func)
-        def _load_wrapper(warehouse: Warehouse, *args, **kwargs):
+        def _load_wrapper(warehouse: Warehouse, *args, **kwargs) -> None:
             _start = perf_counter_ns()
             load_func(self, warehouse)
             self._load_time = (_start, perf_counter_ns())
@@ -342,7 +346,7 @@ class Datasource[T]:
         self.load = _load_wrapper
         return
 
-    def data_wrapper(self, data_func: Callable) -> Callable:  # TODO:
+    def data_wrapper(self, data_func: Callable) -> None:
         """
         Decorator that allows users to bypass `extract` and `transform` methods
         and set the Datasource's `.data` attribute directly.
@@ -371,7 +375,7 @@ class Datasource[T]:
         """
 
         @wraps(data_func)
-        def _data_wrapper(*args, **kwargs):
+        def _data_wrapper(*args, **kwargs) -> None:
             data = data_func(self)
             self._raw_data = data  # TODO: or should raw be None?
             self._data = data
@@ -382,7 +386,7 @@ class Datasource[T]:
         self.raw_data_origin = RawDataOrigin.DIRECTLY_SET
         return
 
-    def cache_write_wrapper(self, cache_write_func: Callable) -> Callable:
+    def cache_write_wrapper(self, cache_write_func: Callable) -> None:
         """
         Decorator to register the class's `cache` method.
 
@@ -396,7 +400,7 @@ class Datasource[T]:
         """
 
         @wraps(cache_write_func)
-        def _cache_write_wrapper(*args, **kwargs):
+        def _cache_write_wrapper(*args, **kwargs) -> None:
             cache_write_func(self)
             # TODO: write metadata JSON file
             self.logger.info(
@@ -409,7 +413,7 @@ class Datasource[T]:
 
     def cache_read_wrapper(
         self, cache_read_func: Callable
-    ) -> Callable:  # TODO: needs attention/testing
+    ) -> None:  # TODO: needs attention/testing
         """
         Decorator to register the class's `read_cache` method.
 
@@ -423,7 +427,7 @@ class Datasource[T]:
         """
 
         @wraps(cache_read_func)
-        def _cache_read_wrapper(*args, **kwargs):
+        def _cache_read_wrapper(*args, **kwargs) -> None:
             self._data = cache_read_func(self)
             self.state = ETLState.TRANSFORMED
             self.raw_data_origin = RawDataOrigin.FROM_CACHE
@@ -436,7 +440,7 @@ class Datasource[T]:
         self.cache_read = _cache_read_wrapper
         return
 
-    def validate_wrapper(self, validate_func: Callable) -> Callable:
+    def validate_wrapper(self, validate_func: Callable) -> None:
         """
         Decorator to register the class's `validate` method.
 
@@ -450,7 +454,7 @@ class Datasource[T]:
         """
 
         @wraps(validate_func)
-        def _validate_wrapper(*args, **kwargs):
+        def _validate_wrapper(*args, **kwargs) -> None:
             validate_func(self)  # Execute the validation function
             self.state = ETLState.VALIDATED
             return
@@ -461,7 +465,7 @@ class Datasource[T]:
     # ========================================================================
     # Misc methods
 
-    def _default_load(self, warehouse):
+    def _default_load(self, warehouse) -> None:
         # Default data loader
         self.logger.info("Loading data (with default loader)")
         try:

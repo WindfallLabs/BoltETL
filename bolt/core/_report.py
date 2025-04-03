@@ -2,18 +2,18 @@
 
 from functools import wraps
 from logging import Logger
-from typing import Any, Callable
+from typing import Any, Callable, Self
 
 from ..utils import IOLogger, make_logger
 from ._options import Options
 
 
-class Report[T]:
-    registry: dict[str, T] = dict()
+class Report:
+    registry: dict[str, Self] = dict()
     failed_to_load: set[tuple[str, Exception]] = set()
 
     def __init__(
-        self,
+        self: Self,
         name: str,
         # output_path: str|Path|None = None,
         options: Options | None = None,
@@ -49,14 +49,14 @@ class Report[T]:
     # ========================================================================
     # MISC
 
-    def _set_warehouse(self, warehouse) -> T:
+    def _set_warehouse(self, warehouse) -> Self:
         """Sets the warehouse attribute."""
         self.warehouse = warehouse
         return self
 
     # ========================================================================
     # Wrapper methods
-    def run_wrapper(self, run_func: Callable) -> Callable:
+    def run_wrapper(self, run_func: Callable) -> None:
         """
         Decorator to register the class's `extract` method.
 
@@ -71,7 +71,7 @@ class Report[T]:
         """
 
         @wraps(run_func)
-        def _run_wrapper(*args, **kwargs):
+        def _run_wrapper(*args, **kwargs) -> None:
             run_func(self, *args, **kwargs)
             return
 
@@ -80,5 +80,5 @@ class Report[T]:
 
     # TODO: consider a @sheet for excel sheets
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Report(name='{self._name}')>"

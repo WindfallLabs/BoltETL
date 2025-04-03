@@ -37,7 +37,7 @@ class Config:
     _default_env_line = f"BOLT-DEFAULT={str(config_dir)}\n"
     env_file = config_dir / ".env"
     if env_file.exists():
-        env_dir = Path(dotenv.dotenv_values(env_file)["BOLT-ACTIVE"])
+        env_dir = Path(dotenv.dotenv_values(env_file)["BOLT-ACTIVE"])  # type: ignore[arg-type]
     else:
         env_dir = config_dir
     log_dir: Path = env_dir / "logs"
@@ -87,13 +87,18 @@ class Config:
     @classmethod
     def use_env(cls, env_name: str):
         """Use a saved environment."""
-        cls.env_dir = Path(dotenv.dotenv_values(cls.env_file)[env_name])
+        cls.env_dir = Path(dotenv.dotenv_values(cls.env_file)[env_name])  # type: ignore[arg-type]
         return
 
     @classmethod
     def get_default_env(cls):
         """Best way to load the default environment."""
         return Path(dotenv.dotenv_values(cls.env_file)["BOLT-DEFAULT"])
+
+    @classmethod
+    def get_env_name(cls):
+        d = {v.__str__(): k for k, v in dotenv.dotenv_values(cls.env_file).items()}
+        return d[cls.env_dir.__str__()]
 
     @classmethod
     def list_envs(cls):

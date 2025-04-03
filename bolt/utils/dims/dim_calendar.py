@@ -18,9 +18,7 @@ options = Options(
     kwargs={"year_range": 25},
 )
 
-dim_calendar = Datasource(
-    name="dim_calendar", source_dir=None, source_filename=None, options=options
-)
+dim_calendar: Datasource = Datasource(name="dim_calendar", options=options)
 
 
 @dim_calendar.data_wrapper

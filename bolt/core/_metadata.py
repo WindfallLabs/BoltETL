@@ -4,6 +4,14 @@ import json
 from dataclasses import dataclass, field
 from hashlib import sha256
 from pathlib import Path
+from typing import TYPE_CHECKING, ForwardRef
+
+if TYPE_CHECKING:
+    from bolt.core._datasource import (
+        Datasource,  # NOTE: can't import this due to cyclical import
+    )
+else:
+    Datasource = ForwardRef("Datasource")
 
 
 @dataclass  # TODO: if this used pydantic instead, we could dump as JSON (to database)
@@ -30,7 +38,7 @@ class Metadata:
     # TODO: database_uri: str|None = None
     # TODO: documentation path?
     schema: list[tuple[str, type]] | None = None  # TODO: final vs prelim?
-    datasource = None
+    datasource: Datasource | None = None
     kwargs: field(default_factory=dict) = None  # type: ignore
 
     def __post_init__(self):
@@ -46,14 +54,17 @@ class Metadata:
             [setattr(self, k, v) for k, v in self.kwargs.items()]
 
     @property
-    def sources_hash(self) -> str:
+    def sources_hash(self) -> str | None:
         """Gets a hash of the source files."""
         if self._sources_hash:
             return self._sources_hash
         hashes: list[str] = []
+        if not self.datasource:
+            return None
         try:
+            p: Path
             for p in self.datasource.source_files:
-                p: Path = Path(p)
+                p = Path(p)
                 if p.is_dir():
                     # raise AttributeError("TODO: Hash cannot be performed on folder")
                     continue
@@ -68,7 +79,7 @@ class Metadata:
         )
         return self._sources_hash
 
-    def to_json(self, json_indent: int = 0):
+    def to_json(self, json_indent: int = 0) -> str:
         d: dict = {}
         for k, v in self.__dict__.items():
             if k in {
@@ -91,7 +102,7 @@ class Metadata:
         return j
 
     def _insert(self, warehouse):
-        meta: str = self.to_json()
+        meta: str = self.to_json()  # type: ignore[annotation-unchecked]
         meta_hash = sha256(meta.encode("UTF8")).hexdigest()[:7]
         s = f"INSERT OR REPLACE INTO bolt_metadata VALUES ('{self.datasource.name}', TODAY(), '{self.sources_hash}', '{meta_hash}', '{meta}');"
         try:

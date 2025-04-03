@@ -1,14 +1,15 @@
 import datetime as dt
 import re
 from pathlib import Path
+from typing import Self
 
 import polars as pl
 
 
-class YearMonth[T]:
+class YearMonth:
     dtype = pl.Int64
 
-    def __init__(self, yearmonth: str | int):
+    def __init__(self: Self, yearmonth: str | int):
         yearmonth_str = str(yearmonth)
         if not re.match(r"^\d{6}$", yearmonth_str):
             raise ValueError("YearMonth must be a 6-digit number (YYYYMM)")
@@ -36,7 +37,7 @@ class YearMonth[T]:
         return self._yearmonth
 
     @classmethod
-    def from_date(cls, date: dt.date) -> T:
+    def from_date(cls, date: dt.date) -> Self:
         """Converts a date (string) to a Year-Month."""
         ymth = int(date.strftime("%Y%m"))
         return cls(ymth)
@@ -52,13 +53,13 @@ class YearMonth[T]:
         )
 
     @classmethod
-    def from_date_string(cls, date_str: str, format: str) -> T:
+    def from_date_string(cls, date_str: str, format: str) -> Self:
         """Converts a date (string) to a Year-Month."""
         ymth = int(dt.datetime.strptime(date_str, format).strftime("%Y%m"))
         return cls(ymth)
 
     @classmethod
-    def from_filepath(cls, filepath: str | Path) -> T:
+    def from_filepath(cls, filepath: str | Path) -> Self:
         """Parses a Year-Month from a path."""
         ymth = re.findall(r"^\d{6}", Path(filepath).name)[0]
         return cls(ymth)
@@ -71,7 +72,7 @@ class YearMonth[T]:
         """Returns a tuple of year and month."""
         return (self.year, self.month)
 
-    def as_series(self, col_name: str = "YMTH") -> pl.Series:
+    def as_series(self, col_name: str = "YMTH") -> pl.Expr:
         """Return an expression defining a YMTH column literal."""
         return pl.lit(self.yearmonth, dtype=self.dtype).cast(pl.Int64).alias(col_name)
 
