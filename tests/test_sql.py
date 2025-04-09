@@ -1,4 +1,4 @@
-from bolt.core._sql import IGNORE_REGEX, REGEX, SQL
+from boltetl.core._sql import IGNORE_REGEX, REGEX, SQL
 
 # @pytest.fixture
 # def cleanup():

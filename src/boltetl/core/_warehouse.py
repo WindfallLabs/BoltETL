@@ -1,6 +1,7 @@
 """DuckDB Data Warehouse"""
 
 from functools import wraps
+from graphlib import TopologicalSorter
 from logging import Logger
 from pathlib import Path
 from typing import Any, Callable, Generator, Literal
@@ -8,7 +9,6 @@ from warnings import warn
 
 import duckdb
 import polars as pl
-from graphlib import TopologicalSorter
 
 from .._config import Config
 from ..utils import IOLogger, make_logger
@@ -234,20 +234,16 @@ class Warehouse[T]:
         new_size = self.path.stat().st_size / 1024
         return (old_size, new_size)
 
-    def create_dependency_graph(
-        self, small=False
-    ) -> tuple[str] | list[tuple[str, str, set]]:
+    def create_dependency_graph(self, small=False) -> tuple[str] | list[tuple[str, str, set]]:
         """Sorts registered SQL objects by dependency requirements."""
         if not getattr(self, "_ENV_LOADED", False):
-            warn("User-defined objects not loaded. Use `import bolt.env` to resolve.")
+            warn("User-defined objects not loaded. Use `import boltetl.env` to resolve.")
 
         default_duckdb_tables = {"duckdb_tables", "duckdb_views"}
         script_dependencies = {}
         for name, obj in self.sql_registry.items():
             clean_deps = set()
-            deps: set[str] = {
-                d for d in obj.dependencies if d not in self.ignored_dependencies
-            }
+            deps: set[str] = {d for d in obj.dependencies if d not in self.ignored_dependencies}
             for dep in deps:
                 if dep in self.ignored_dependencies:
                     continue
@@ -278,9 +274,9 @@ class Warehouse[T]:
 
     def execution_plan(self) -> Generator[T, None, None]:
         """Generates SQL scripts sorted by dependency requirements."""
-        import bolt.env
+        import boltetl.env
 
-        bolt.env.datasources.load_all()
+        boltetl.env.datasources.load_all()
         graph: list[tuple[str, str, set]] = self.create_dependency_graph()
 
         for dep_name, dep_type, deps in graph:
@@ -332,9 +328,7 @@ class Warehouse[T]:
     def get_data(self, table_name) -> pl.DataFrame:
         """Return a table from the warehouse by name."""
         if table_name not in self.list_tables():
-            raise KeyError(
-                f"'{table_name}' table/view does not exist"
-            )  # TODO: exception type
+            raise KeyError(f"'{table_name}' table/view does not exist")  # TODO: exception type
         with self.connect() as con:
             try:
                 df = con.sql(f"SELECT * FROM {table_name};").pl()
@@ -394,9 +388,7 @@ class Warehouse[T]:
 
                 with self.connect() as con:
                     df: pd.DataFrame = tbl.df().dtypes.reset_index()  # type: ignore[no-redef]
-                schema = list(
-                    zip((table,) * len(df), df["index"], [i.name for i in df[0]])
-                )
+                schema = list(zip((table,) * len(df), df["index"], [i.name for i in df[0]]))
                 return schema
 
         # DuckDB
@@ -422,12 +414,8 @@ class Warehouse[T]:
                 # Compare hashes and skip if they are the same
                 if not db_hash.is_empty() and current_hash == db_hash.item():
                     do_update = False
-                    datasource.logger.debug(
-                        f"Database hash (source files): {db_hash.item()}"
-                    )
-                    datasource.logger.debug(
-                        f"Current hash (source files): {current_hash}"
-                    )
+                    datasource.logger.debug(f"Database hash (source files): {db_hash.item()}")
+                    datasource.logger.debug(f"Current hash (source files): {current_hash}")
         except Exception as e:
             datasource.logger.error(f"Comparing hashes failed: {e}")
         finally:
@@ -511,9 +499,7 @@ class Warehouse[T]:
         compact_msg = "[yellow]Not compacted[/]"
         if compact:
             compact_sizes = self.compact()
-            compact_msg = (
-                f"Compacted Database: {compact_sizes[0]} KB -> {compact_sizes[1]} KB"
-            )
+            compact_msg = f"Compacted Database: {compact_sizes[0]} KB -> {compact_sizes[1]} KB"
         return sql_file_count, compact_msg  # TODO: ...
 
     # ========================================================================

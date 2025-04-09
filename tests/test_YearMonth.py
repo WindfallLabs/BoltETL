@@ -1,15 +1,13 @@
 """Tests for YearMonth object."""
 
 import datetime as dt
-import sys
 from pathlib import Path
 
 import polars as pl
 import pytest
 
 # Assuming the YearMonth class is in a module called yearmonth
-sys.path.append(r"C:\Workspace\tmpdb\.BoltETL")
-from bolt.utils import YearMonth
+from boltetl.utils import YearMonth
 
 
 def test_basic_initialization():

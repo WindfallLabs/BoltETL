@@ -1,0 +1,9 @@
+site_name: BoltETL
+theme:
+  name: material
+markdown_extensions:
+  - admonition
+  - codehilite
+plugins:
+- search
+- mkdocstrings

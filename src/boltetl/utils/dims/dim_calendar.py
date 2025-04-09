@@ -7,8 +7,8 @@ from itertools import cycle
 import holidays
 import polars as pl
 
-from bolt.core._datasource import Datasource
-from bolt.core._options import Options
+from boltetl.core._datasource import Datasource
+from boltetl.core._options import Options
 
 calendar.setfirstweekday(1)
 
@@ -24,9 +24,7 @@ dim_calendar: Datasource = Datasource(name="dim_calendar", options=options)
 @dim_calendar.data_wrapper
 def data(obj):
     this_year = dt.datetime.now().year
-    years = range(
-        this_year - obj.options.year_range, this_year + obj.options.year_range
-    )
+    years = range(this_year - obj.options.year_range, this_year + obj.options.year_range)
 
     cal = calendar.Calendar()
 
@@ -52,11 +50,7 @@ def data(obj):
             zips.append(
                 # Get full calendar
                 pl.DataFrame(
-                    [
-                        (dt.date(year, m, day), day_name)
-                        for day, day_name in cal_zip
-                        if day > 0
-                    ],
+                    [(dt.date(year, m, day), day_name) for day, day_name in cal_zip if day > 0],
                     schema=["Date", "DayName"],
                     orient="row",
                 )
@@ -88,9 +82,7 @@ def data(obj):
             (
                 pl.col("Date")
                 .dt.quarter()
-                .map_elements(
-                    lambda x: {1: 3, 2: 4, 3: 1, 4: 2}[x], return_dtype=pl.Int8
-                )
+                .map_elements(lambda x: {1: 3, 2: 4, 3: 1, 4: 2}[x], return_dtype=pl.Int8)
                 .alias("FiscalQuarter")
             ),
             # Day Abbr

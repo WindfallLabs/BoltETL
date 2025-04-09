@@ -22,6 +22,10 @@ wheels/
 venv/
 ENV/
 .ruff_cache/
+.pytest_cache/
+
+# Docs
+site/
 
 # Coverage
 .coverage

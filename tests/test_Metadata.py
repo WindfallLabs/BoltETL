@@ -1,4 +1,4 @@
-from bolt import Metadata
+from boltetl import Metadata
 
 
 def test_metadata():

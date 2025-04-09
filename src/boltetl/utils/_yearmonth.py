@@ -45,9 +45,7 @@ class YearMonth:
     @classmethod
     def from_date_series(cls, date_col: pl.Expr) -> pl.Expr:
         return (
-            date_col.map_elements(
-                lambda x: int(cls.from_date(x)), return_dtype=cls.dtype
-            )
+            date_col.map_elements(lambda x: int(cls.from_date(x)), return_dtype=cls.dtype)
             .cast(pl.Int64)
             .alias("YMTH")
         )

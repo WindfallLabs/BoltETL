@@ -242,7 +242,7 @@ class Datasource:
         Example:
             ```python
             import polars as pl
-            from bolt import Datasource
+            from boltetl import Datasource
 
             test_datasource = Datasource(name="TEST")
 
@@ -284,7 +284,7 @@ class Datasource:
         Example:
             ```python
             import polars as pl
-            from bolt import Datasource
+            from boltetl import Datasource
 
             test_datasource = Datasource(name="TEST")
 
@@ -330,7 +330,7 @@ class Datasource:
         Returns:
             None
         """
-        from bolt.core._warehouse import Warehouse  # noqa
+        from boltetl.core._warehouse import Warehouse  # noqa
 
         @wraps(load_func)
         def _load_wrapper(warehouse: Warehouse, *args, **kwargs) -> None:
@@ -362,7 +362,7 @@ class Datasource:
         Example:
             ```python
             import polars as pl
-            from bolt import Datasource
+            from boltetl import Datasource
 
             test_datasource = Datasource(name="TEST")
 
@@ -485,8 +485,8 @@ class Datasource:
     # def read_warehouse(self) -> None:
     #     """Load the processed data from the warehouse/database."""
     #     # TODO: should we enable users to access end-of-lifecycle data as a 'source'?
-    #     import bolt.env
-    #     df: pl.DataFrame = bolt.env.warehouse.get_data(self.name)
+    #     import boltetl.env
+    #     df: pl.DataFrame = boltetl.env.warehouse.get_data(self.name)
     #     self._data = df
     #     self.state = ETLState.READ_FROM_WAREHOUSE
     #     return
@@ -499,7 +499,7 @@ class Datasource:
         Executes the ETL operations.
 
         Args:
-            warehouse (bolt.Warehouse): The user's warehouse/database (bolt.env.warehouse)
+            warehouse (boltetl.Warehouse): The user's warehouse/database (boltetl.env.warehouse)
 
         Returns:
             data (Any): Processed data (probably a DataFrame)

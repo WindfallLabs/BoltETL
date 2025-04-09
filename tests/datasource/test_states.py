@@ -1,4 +1,4 @@
-from bolt.core._datasource import ETLState
+from boltetl.core._datasource import ETLState
 
 
 def test_etlstate():

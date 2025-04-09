@@ -12,11 +12,11 @@ import duckdb  # noqa: E402
 import polars as pl  # noqa: E402
 from rich.console import Console  # noqa: E402
 
-import bolt  # noqa: E402
-import bolt.env  # noqa: E402
-from bolt.utils import time_diff  # noqa: E402
+import boltetl  # noqa: E402
+import boltetl.env  # noqa: E402
+from boltetl.utils import time_diff  # noqa: E402
 
-__version__ = bolt.__version__
+__version__ = boltetl.__version__
 
 console = Console()
 app = cyclopts.App()
@@ -28,9 +28,9 @@ logo = """┏━━┓━━━━━┏┓━━┏┓━┏━━━┓┏━�
 ┃┗━┛┃┃┗┛┃┃┗┓━┃┗┓┃┗━━┓━┏┛┗┓━┃┗━┛┃
 ┗━━━┛┗━━┛┗━┛━┗━┛┗━━━┛━┗━━┛━┗━━━┛"""
 
-ENV = bolt.Config.env_dir
+ENV = boltetl.Config.env_dir
 SCRIPT = Path(__file__).name
-WAREHOUSE: bolt.Warehouse = bolt.env.warehouse
+WAREHOUSE: boltetl.Warehouse = boltetl.env.warehouse
 USER = f"{node()}/{getuser()}"
 
 
@@ -65,8 +65,8 @@ def env(
     # ------------------------------------------------------------------------
     # LIST
     if option.lower() == "list":
-        envs = bolt.Config.list_envs()
-        current = bolt.Config.env_dir
+        envs = boltetl.Config.list_envs()
+        current = boltetl.Config.env_dir
         console.print("Available Environments:")
         for env in envs:
             if env[0] == "BOLT-ACTIVE":
@@ -79,7 +79,7 @@ def env(
     # ADD
     elif option.lower() == "add":
         default = kwargs.get("default", False)
-        bolt.Config.add_env(env_name, kwargs["path"], default)
+        boltetl.Config.add_env(env_name, kwargs["path"], default)
         console.print(f"Added [green]{env_name}[/]")
         if default:
             console.print("[cyan](Set as default)[/]")
@@ -87,10 +87,8 @@ def env(
     # CHANGE
     elif option.lower() == "activate":
         # TODO: warn that env is already active
-        bolt.Config.activate_env(env_name)
-        console.print(
-            f"Activated environment: [green]{env_name} ({bolt.Config.env_dir})[/]"
-        )
+        boltetl.Config.activate_env(env_name)
+        console.print(f"Activated environment: [green]{env_name} ({boltetl.Config.env_dir})[/]")
     console.print()
     return
 
@@ -104,7 +102,7 @@ def most_recent(datasource_name: str | None = None):
     `python bolt-cmd.py most-recent`
     `python bolt-cmd.py most-recent MyDataset`
     """
-    bolt.env.datasources.load_all()
+    boltetl.env.datasources.load_all()
     for datasource_name, datasource in WAREHOUSE.datasource_registry.items():
         files = datasource.source_files
         source_info = f"{datasource.metadata.vendor}"
@@ -151,7 +149,7 @@ def report(option: Literal["list", "info", "run"], rpt_name: str = "", *args, **
     # TODO: consider an '--update' flag to update report dependencies
     # e.g. python bolt-cmd.py report run ParatransitNoShows --update
     # NOTE: list option does not require 'rpt_name'
-    bolt.env.reports.load_all()
+    boltetl.env.reports.load_all()
     if option == "list":
         console.print("Available Reports:")
         for rpt in WAREHOUSE.report_registry.values():
@@ -206,7 +204,7 @@ def task(
 @app.command
 def execution_order():
     """Displays the order that registered SQL files will be executed in."""
-    bolt.env.datasources.load_all()
+    boltetl.env.datasources.load_all()
     file_order: list[str] = [i.path.name for i in WAREHOUSE.execution_plan() if i.path]
     console.print(f"SQL Execution Order ({len(file_order)} files):")
     for n, i in enumerate(file_order):
@@ -277,11 +275,11 @@ def update(
     if quiet:
         console.print("[black b]Updating...[/]")
         console.quiet = True
-    bolt.env.datasources.load_all()
+    boltetl.env.datasources.load_all()
     if not ignore:
         ignore = []
     # Determine datasources to process
-    datasources: list[bolt.datasources.Datasource] | None = None
+    datasources: list[boltetl.datasources.Datasource] | None = None
     ## All
     if datasource_name == ".":
         datasources = list(WAREHOUSE.datasource_registry.values())
@@ -295,19 +293,15 @@ def update(
     # A list of errors to print
     errors: list[tuple[str, Exception]] = []
     # Loading failures
-    loading_error_cnt = len(bolt.Datasource.failed_to_load) + len(
-        bolt.Report.failed_to_load
-    )
+    loading_error_cnt = len(boltetl.Datasource.failed_to_load) + len(boltetl.Report.failed_to_load)
     loading_errs = set()
     if loading_error_cnt > 0:
         console.print(f"[red]Import Error(s) occured:[/] {loading_error_cnt}")
-        for failed in bolt.Datasource.failed_to_load:
+        for failed in boltetl.Datasource.failed_to_load:
             loading_errs.add(failed)
             # TODO: log
             if failed in ignore or ignore_errors:
-                console.print(
-                    f"        [yellow]Error:   {failed[0]} ([i]ignored[/i])[/]"
-                )
+                console.print(f"        [yellow]Error:   {failed[0]} ([i]ignored[/i])[/]")
             else:
                 console.print(f"        [red]Error:   {failed[0]}[/]")
         console.print()
@@ -357,9 +351,7 @@ def update(
                     # Confirm load success
                     if d.name not in WAREHOUSE.list_tables():
                         d.logger.critical("FAILURE: Table load could not be confirmed")
-                        raise duckdb.DataError(
-                            "Table does not exist after attempting load"
-                        )
+                        raise duckdb.DataError("Table does not exist after attempting load")
                     d.logger.info("Table load confirmed")
                     console.print(
                         f"        [green]Updated: {d.name}[/]  [blue](E:{d.extract_time} T:{d.transform_time} L:{d.load_time})[/]"
@@ -397,7 +389,7 @@ def update(
         with console.status("Updating database:"):
             try:
                 sql_file_count, compact_msg = WAREHOUSE.rebuild(compact=True)
-                # WAREHOUSE.create_schema_table()
+                # TODO: WAREHOUSE.create_schema_table()
                 db_msg = (
                     f"        [green]Updated: {WAREHOUSE.name}[/]\n"
                     f"            SQL Files Executed: {sql_file_count}\n"
@@ -424,7 +416,7 @@ def update(
         for name, err in errors:
             console.print(f"- [blue]{name}[/]: [red]{err}[/]")
         # Report-loading errors
-        for rpt_name, err in bolt.Report.failed_to_load:
+        for rpt_name, err in boltetl.Report.failed_to_load:
             console.print(
                 f"- [blue]{rpt_name}[/] (Report) [red]failed to import:[/]\n    [red b]{err}[/]"
             )
@@ -440,7 +432,7 @@ if __name__ == "__main__":
         # console.print(f"\nBoltCMD ([b blue]v{__version__}[/])")
         console.print(
             f"\nBoltCMD ([b blue]v{__version__}[/]) [green]"
-            rf"\[{bolt.Config.get_env_name()}][/]"
+            rf"\[{boltetl.Config.get_env_name()}][/]"
         )
         app()
     except Exception:

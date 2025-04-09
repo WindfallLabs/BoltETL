@@ -71,9 +71,7 @@ class Metadata:
                 with p.open("rb") as f:
                     hashes.append(sha256(f.read()).hexdigest())
         except Exception:
-            raise AttributeError(
-                f"TODO: Hash cannot be performed on {self.datasource.name}"
-            )
+            raise AttributeError(f"TODO: Hash cannot be performed on {self.datasource.name}")
         self._sources_hash = (
             sha256("".join(hashes).encode("UTF8")).hexdigest()[:7]  # NOTE: git uses 7
         )

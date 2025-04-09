@@ -1,12 +1,9 @@
 """Test schema functions."""
 
-import sys
-
 import polars as pl
 import pytest
 
-sys.path.append(r"C:\Workspace\tmpdb\.BoltETL")
-from bolt.utils import schema
+from boltetl.utils import schema
 
 
 def test_check_names():
@@ -36,9 +33,7 @@ def test_apply_sorting():
     df = pl.DataFrame(
         {"a": [1, 2, 3], "b": ["one", "two", "three"], "y": [0, 0, 0], "z": [4, 5, 6]}
     )
-    exp_df_drop = pl.DataFrame(
-        {"z": [4, 5, 6], "a": [1, 2, 3], "b": ["one", "two", "three"]}
-    )
+    exp_df_drop = pl.DataFrame({"z": [4, 5, 6], "a": [1, 2, 3], "b": ["one", "two", "three"]})
     exp_schema_drop = (("z", pl.Int8), ("a", pl.Int8), ("b", pl.String), ("y", None))
     assert schema.apply_sorting(df, exp_schema_drop).equals(exp_df_drop)
     # With Drop

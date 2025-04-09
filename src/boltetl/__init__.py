@@ -4,7 +4,7 @@ from . import utils
 from ._config import Config
 from .core import SQL, Datasource, Metadata, Options, Report, Warehouse
 
-__version__ = "0.3.0"
+__version__ = "0.3.0-dev"
 
 __all__ = [
     "Config",

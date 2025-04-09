@@ -1,7 +1,7 @@
 import polars as pl
 
-from bolt._config import Config
-from bolt.core._datasource import Datasource, ETLState, RawDataOrigin
+from boltetl._config import Config
+from boltetl.core._datasource import Datasource, ETLState, RawDataOrigin
 
 
 def test_data_wrapper():

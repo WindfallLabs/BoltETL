@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from bolt.core._sql import SQL
-from bolt.core._warehouse import Warehouse
+from boltetl.core._sql import SQL
+from boltetl.core._warehouse import Warehouse
 
 WH_PATH = Path(__file__).parent / "artifacts" / "test_warehouse.duckdb"
 
@@ -110,9 +110,7 @@ def test_sql_function(warehouse):
 def test_create_depenedency_graph(warehouse):
     @warehouse.script_wrapper
     def view_test(*args, **kwargs):
-        return (
-            "CREATE VIEW view_test AS SELECT * FROM table1 UNION SELECT * FROM table2"
-        )
+        return "CREATE VIEW view_test AS SELECT * FROM table1 UNION SELECT * FROM table2"
 
     @warehouse.script_wrapper
     def view_another(*args, **kwargs):

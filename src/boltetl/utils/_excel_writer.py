@@ -29,9 +29,7 @@ def dict_to_sheets(
                 if isinstance(dataframe, pl.DataFrame):
                     dataframe = dataframe.to_pandas()
                 else:
-                    raise ValueError(
-                        f"Expected pd.DataFrame for '{sheet_name}', got {dataframe}"
-                    )
+                    raise ValueError(f"Expected pd.DataFrame for '{sheet_name}', got {dataframe}")
             # Ignore sheets that start with "_"
             if sheet_name.startswith("_"):
                 continue

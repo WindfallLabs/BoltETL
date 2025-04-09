@@ -1,13 +1,11 @@
 """Test schema enforce function."""
 
 import datetime as dt
-import sys
 
 import polars as pl
 import pytest
 
-sys.path.append(r"C:\Workspace\tmpdb\.BoltETL")
-from bolt.utils import schema
+from boltetl.utils import schema
 
 
 def test_enforce_numeric():

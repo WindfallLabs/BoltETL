@@ -29,9 +29,7 @@ class IOLogRecord(logging.LogRecord):
         sinfo=None,
         **kwargs,
     ):
-        super().__init__(
-            name, level, pathname, lineno, msg, args, exc_info, func, sinfo
-        )
+        super().__init__(name, level, pathname, lineno, msg, args, exc_info, func, sinfo)
         self.asctime = self.created
 
 

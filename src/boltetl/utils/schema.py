@@ -6,7 +6,7 @@ from warnings import deprecated
 import pandas as pd  # type: ignore[import-untyped]
 import polars as pl  # type: ignore[import-untyped]
 from dateutil.parser import parse as parse_date  # type: ignore[import-untyped]
-from polars.datatypes.classes import DataTypeClass, TemporalType
+from polars.datatypes.classes import DataTypeClass
 
 
 def conform(
@@ -32,9 +32,7 @@ def conform(
     df_cols = {col for col in orig_schema.keys()}
     missing = df_cols.difference(schema_cols)
     if len(missing) > 0:
-        raise pl.exceptions.SchemaError(
-            f"DataFrame has columns not defined by schema: {missing}"
-        )
+        raise pl.exceptions.SchemaError(f"DataFrame has columns not defined by schema: {missing}")
 
     i: tuple[str, DataTypeClass] | tuple[str, DataTypeClass, str]
     expr: pl.Expr | pl.Series
@@ -52,12 +50,8 @@ def conform(
             orig_dtype = orig_schema[i[0]]
 
             # String -> Date, Datetime, Time types
-            # if orig_dtype == pl.String and i[1] in (pl.Date, pl.Datetime, pl.Time):
-            if (
-                orig_dtype == pl.String
-                and issubclass(i[1], TemporalType)
-                and i[1] != pl.Duration
-            ):
+            if orig_dtype == pl.String and i[1] in (pl.Date, pl.Datetime, pl.Time):
+                # TODO: if orig_dtype == pl.String and issubclass(i[1], TemporalType) and i[1] != pl.Duration:
                 expr = pl.col(i[0]).str.strptime(
                     format=dt_fmt, dtype=i[1], strict=False, ambiguous="null"
                 )
@@ -203,9 +197,7 @@ def enforce(
                         (
                             pl.col(col)
                             .replace("", None)
-                            .map_elements(
-                                lambda x: parse_date(x).date(), return_dtype=pl.Date()
-                            )
+                            .map_elements(lambda x: parse_date(x).date(), return_dtype=pl.Date())
                         )
                     )
                 else:
@@ -220,18 +212,14 @@ def enforce(
                         )
                     )
                 else:
-                    expressions.append(
-                        pl.col(col).replace("", None).cast(pl.Datetime())
-                    )
+                    expressions.append(pl.col(col).replace("", None).cast(pl.Datetime()))
             elif dtype_name == "Time":
                 if parse_dates:
                     expressions.append(
                         (
                             pl.col(col)
                             .replace("", None)
-                            .map_elements(
-                                lambda x: parse_date(x).time(), return_dtype=pl.Time()
-                            )
+                            .map_elements(lambda x: parse_date(x).time(), return_dtype=pl.Time())
                         )
                     )
                 else:

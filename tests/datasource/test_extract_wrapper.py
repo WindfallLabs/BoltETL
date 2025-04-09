@@ -1,16 +1,14 @@
 import polars as pl
 
-from bolt._config import Config
-from bolt.core._datasource import Datasource, ETLState, RawDataOrigin
+from boltetl._config import Config
+from boltetl.core._datasource import Datasource, ETLState, RawDataOrigin
 
 
 def test_extract_wrapper():
     Config.log_dir = None
     DATA = pl.DataFrame({"name": ["Sugar", "Spice"], "species": ["cat", "cat"]})
 
-    test_datasource = Datasource(
-        name="EXTRACT_TEST", source_dir=None, source_filename=None
-    )
+    test_datasource = Datasource(name="EXTRACT_TEST", source_dir=None, source_filename=None)
     assert test_datasource.state == ETLState.INIT
     assert test_datasource.raw_data is None
     assert test_datasource.has_raw_data is False

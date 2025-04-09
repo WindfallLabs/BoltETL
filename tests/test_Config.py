@@ -6,7 +6,7 @@ import pytest
 
 @pytest.fixture
 def cfg():
-    from bolt._config import Config
+    from boltetl._config import Config
 
     Config.config_dir = Path(__file__).parent / "artifacts" / "conf"
     Config.env_file = Config.config_dir / ".env"
