@@ -248,7 +248,7 @@ class Warehouse[T]:
                 if dep in self.ignored_dependencies:
                     continue
                 elif dep in self.datasource_registry.keys():
-                    continue  # TODO: update dependent Datasources if bolt-cmd not called with "."
+                    continue  # TODO: update dependent Datasources if bolt_cli not called with "."
                 elif dep in default_duckdb_tables:  # TODO:
                     continue
                 clean_deps.add(dep)
@@ -478,7 +478,7 @@ class Warehouse[T]:
     def rebuild(self, destroy=False, compact=True):
         """."""
         # Deletes the DuckDB file if `destroy==True`
-        # TODO: Execute all necessary Datasource ETL pipelines (remove from bolt-cmd)
+        # TODO: Execute all necessary Datasource ETL pipelines (remove from bolt_cli.py?)
         # Execute all SQL scripts
         # """Execute SQL scripts against the warehouse."""
         sql_file_count = 0

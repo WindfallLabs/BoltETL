@@ -7,6 +7,8 @@ from pathlib import Path
 from time import perf_counter_ns
 from typing import Any, Callable, Optional, Self
 
+from rich.console import Console
+
 from .._config import Config
 from ..utils import IOLogger, make_logger, time_diff
 from ._metadata import Metadata
@@ -33,11 +35,8 @@ class ETLState(Enum):
     INIT = "INIT"
     EXTRACTED = "EXTRACTED"
     TRANSFORMED = "TRANSFORMED"
-    READ_FROM_CACHE = "READ_FROM_CACHE"
-    DIRECTLY_SET = "DIRECTLY_SET"
     VALIDATED = "VALIDATED"
     LOADED = "LOADED"
-    # READ_FROM_WAREHOUSE = "READ_FROM_WAREHOUSE"
 
     def __repr__(self):
         return f"<ETLState.{self.name}>"
@@ -114,14 +113,21 @@ class Datasource:
         self._extract_time: tuple[float, float] | None = None
         self._transform_time: tuple[float, float] | None = None
         self._load_time: tuple[float, float] | None = None
+        self._cache_write_time: tuple[float, float] | None = None
+        self._cache_read_time: tuple[float, float] | None = None
 
         # Processing attributes
         self.extract: Optional[Callable] = None
         self.transform: Optional[Callable] = None
-        self.cache_write: Optional[Callable] = None
-        self.cache_read: Optional[Callable] = None
+        self.write_cache: Optional[Callable] = None
+        self.read_cache: Optional[Callable] = None
         self.validate: Optional[Callable] = None
         self.load: Optional[Callable] = None
+
+        # Wrapper aliases # TODO: good idea?
+        self.E = self.extract_wrapper
+        self.T = self.transform_wrapper
+        self.L = self.load_wrapper
 
         # Register datasource
         if self.options.register:
@@ -164,64 +170,83 @@ class Datasource:
         return self._data
 
     @property
-    def has_raw_data(self):
+    def has_raw_data(self) -> bool:
         """Whether or not `self.data is not None`."""
         return self.raw_data is not None
 
     @property
-    def has_data(self):
+    def has_data(self) -> bool:
         """Whether or not `self.data is not None`."""
         return self.data is not None
 
     @property
-    def is_extracted(self):
+    def is_extracted(self) -> bool:
         """Whether or not the `extract` method was called successfully."""
         return self.state >= ETLState.EXTRACTED and (self.has_raw_data or self.has_data)
 
     @property
-    def is_transformed(self):
+    def is_transformed(self) -> bool:
         """Whether or not the `transform` method was called successfully."""
         return self.state >= ETLState.TRANSFORMED
 
     @property
-    def is_directly_set(self):
+    def is_directly_set(self) -> bool:
         """Whether or not the data was set within a `data_wrapper`."""
         return self.raw_data_origin == RawDataOrigin.DIRECTLY_SET and self.has_data
 
     @property
-    def is_loaded(self):
+    def is_loaded(self) -> bool:
         """Whether or not the `load` method was called successfully."""
         return self.state >= ETLState.LOADED
 
     @property
-    def is_cached_data(self):
+    def is_cached_data(self) -> bool:
         """Whether or not `self.data` was read from cache."""
         return self.raw_data_origin == RawDataOrigin.FROM_CACHE
 
-    @property
-    def has_cached_data(self):
-        """Whether or not transformed data exists on-disk."""
-        return self.options.cache_path and self.options.cache_path.exists()
+    # @property  # TODO: fix
+    # def has_cached_data(self) -> bool:
+    #    """Whether or not transformed data exists on-disk."""
+    #    return self.options.cache_path and self.options.cache_path.exists()
 
     @property
-    def extract_time(self):
+    def cache_dir(self) -> Path | None:
+        """Path to cache directory, if set in options."""
+        return self.options.cache_dir
+
+    @property
+    def extract_time(self) -> str:
         """The run time of the extract function."""
         if self._extract_time:
             return time_diff(*self._extract_time)
         return "-1"
 
     @property
-    def transform_time(self):
+    def transform_time(self) -> str:
         """The run time of the transform function."""
         if self._transform_time:
             return time_diff(*self._transform_time)
         return "-1"
 
     @property
-    def load_time(self):
+    def load_time(self) -> str:
         """The run time of the load function."""
         if self._load_time:
             return time_diff(*self._load_time)
+        return "-1"
+
+    @property
+    def cache_write_time(self) -> str:
+        """The write time of the write_cache function."""
+        if self._cache_write_time:
+            return time_diff(*self._cache_write_time)
+        return "-1"
+
+    @property
+    def cache_read_time(self) -> str:
+        """The read time of the read_cache function."""
+        if self._cache_read_time:
+            return time_diff(*self._cache_read_time)
         return "-1"
 
     # ========================================================================
@@ -376,14 +401,13 @@ class Datasource:
 
         @wraps(data_func)
         def _data_wrapper(*args, **kwargs) -> None:
-            data = data_func(self)
-            self._raw_data = data  # TODO: or should raw be None?
-            self._data = data
+            self._data = data_func(self)
+            # NOTE: self._raw_data should be left None
+            self.state = ETLState.TRANSFORMED
+            self.raw_data_origin = RawDataOrigin.DIRECTLY_SET
             return
 
-        self.extract = _data_wrapper
-        self.state = ETLState.TRANSFORMED
-        self.raw_data_origin = RawDataOrigin.DIRECTLY_SET
+        _data_wrapper()
         return
 
     def cache_write_wrapper(self, cache_write_func: Callable) -> None:
@@ -401,14 +425,14 @@ class Datasource:
 
         @wraps(cache_write_func)
         def _cache_write_wrapper(*args, **kwargs) -> None:
+            _start = perf_counter_ns()
             cache_write_func(self)
+            self._cache_write_time = (_start, perf_counter_ns())
             # TODO: write metadata JSON file
-            self.logger.info(
-                f"Cache written: saved tranformed data to disk ('{self.options.cache_path}')"
-            )
+            self.logger.info(f"Cached transformed data (in {self.cache_write_time})")
             return
 
-        self.cache_write = _cache_write_wrapper
+        self.write_cache = _cache_write_wrapper
         return
 
     def cache_read_wrapper(
@@ -428,16 +452,19 @@ class Datasource:
 
         @wraps(cache_read_func)
         def _cache_read_wrapper(*args, **kwargs) -> None:
+            _start = perf_counter_ns()
             self._data = cache_read_func(self)
+            # NOTE: self._raw_data should be left None
+            if self._data is None:
+                raise ValueError("Cache-reading function must return data")
+            self._cache_read_time = (_start, perf_counter_ns())
+            self.logger.info(f"Cached data read (in {self.cache_read_time})")
             self.state = ETLState.TRANSFORMED
             self.raw_data_origin = RawDataOrigin.FROM_CACHE
             # TODO: read metadata JSON file
-            self.logger.info(
-                f"Cache read: read tranformed data from disk ('{self.options.cache_path}')"
-            )
             return
 
-        self.cache_read = _cache_read_wrapper
+        self.read_cache = _cache_read_wrapper
         return
 
     def validate_wrapper(self, validate_func: Callable) -> None:
@@ -462,6 +489,27 @@ class Datasource:
         # self.cache = _validate_wrapper
         return
 
+    def tool(self, tool_func: Callable) -> None:
+        """
+        Decorator to register a "tool" method on the class.
+        (This basically amounts to defining a method on the class.)
+
+        The function that this decorator wraps must have the following arguments:
+
+        Args:
+            arg (type): Desc
+
+        Returns:
+            Callable: Decorated function
+        """
+
+        @wraps(tool_func)
+        def _tool_wrapper(*args, **kwargs) -> None:
+            return tool_func(self, *args, **kwargs)  # Execute the tool
+
+        setattr(self, tool_func.__name__, _tool_wrapper)
+        return
+
     # ========================================================================
     # Misc methods
 
@@ -482,6 +530,11 @@ class Datasource:
         self.logger.info("Metadata inserted")
         return
 
+    @staticmethod
+    def get_console(tool_kwargs: dict) -> Console:
+        """Utility method for passing a rich.console.Console to the tool."""
+        return tool_kwargs.get("console", Console())
+
     # def read_warehouse(self) -> None:
     #     """Load the processed data from the warehouse/database."""
     #     # TODO: should we enable users to access end-of-lifecycle data as a 'source'?
@@ -494,7 +547,7 @@ class Datasource:
     # ========================================================================
     # Update method
 
-    def update(self, warehouse) -> Any:  # TODO: consider 'execute_pipeline()'
+    def update(self, warehouse, force=False) -> None:  # TODO: consider 'execute_pipeline()'
         """
         Executes the ETL operations.
 
@@ -519,43 +572,46 @@ class Datasource:
             self.logger.critical(extract_error_msg)
             raise ValueError(extract_error_msg)
 
-        # Check that `load` method is set
-        # if not self.load and TEST_FLAG:
-        #     load_error_msg = "A `load` function is required"  # TODO: is it though?
-        #     self.logger.critical(load_error_msg)
-        #     raise ValueError(load_error_msg)
-
         # --------------------------------------------------------------------
-        # Extract data
-        if self.raw_data_origin == RawDataOrigin.EXTRACTED:
+        # Read cached data if a read_cache function is defined, and not force
+        if self.read_cache and force is False:
+            self.logger.info(f"Reading cached file(s) from '{self.cache_dir}'")
+            self.read_cache()
+        # if self.raw_data_origin == RawDataOrigin.EXTRACTED:
+        # TODO:
+        # elif directly-set ...
+        else:
             self.logger.info(
                 f"Extracting data from {len(self.source_files)} file(s) in '{self.source_dir}'"
             )
-        self.extract()
+            self.extract()
 
         # --------------------------------------------------------------------
         # Transform data if `transform` function was defined
-        if self.transform:
+        if self.transform and self.state < ETLState.TRANSFORMED:
             self.logger.info("Applying transformation(s)")
             self.transform()
-        else:
-            self.logger.warning("No extract function defined")
+        # else:
+        #    self.logger.warning(
+        #        "No transform function defined; setting `data` to `raw_data`"
+        #    )
+        #    self._data = self._raw_data
 
         # --------------------------------------------------------------------
-        # Cache
-        # Transformed data optionally saved to disk
-        if self.cache_write is None and self.options.cache_path:
-            self.logger.warning(
-                f"No `cache` function specified; but `options.cache_path` was: '{self.options.cache_path}'"
-            )
-        elif self.cache_write and self.options.cache_path is None:
-            self.logger.warning(
-                "`cache` function specified, but no value set to `options.cache_path`"
-            )
-        elif self.cache_write and self.options.cache_path:
-            self.logger.info(f"Caching data to '{self.options.cache_path}'")
-            self.cache_write()
-            # Else, no caching
+        # Optionally write transformed data to cache (disk)
+        if self.raw_data_origin != RawDataOrigin.FROM_CACHE:
+            if self.write_cache is None and self.options.cache_dir:
+                self.logger.warning(
+                    f"No `write_cache` function specified; but `options.cache_dir` was: '{self.options.cache_dir}'"
+                )
+            elif self.write_cache and self.options.cache_dir is None:
+                self.logger.warning(
+                    "`write_cache` function specified, but no value set to `options.cache_dir`"
+                )
+            elif self.write_cache and self.options.cache_dir:
+                self.logger.info(f"Caching data to '{self.options.cache_dir}'")
+                self.write_cache()
+                # Else, no caching
 
         # --------------------------------------------------------------------
         # Validate

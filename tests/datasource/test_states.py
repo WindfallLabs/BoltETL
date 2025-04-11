@@ -5,10 +5,10 @@ def test_etlstate():
     state = ETLState.INIT
     assert state == ETLState.INIT
     assert repr(state) == "<ETLState.INIT>"
+
     state = ETLState.EXTRACTED
     assert state > ETLState.INIT
 
-    state = ETLState.DIRECTLY_SET
+    state = ETLState.TRANSFORMED
     assert state >= ETLState.EXTRACTED
-    assert state <= ETLState.DIRECTLY_SET
     assert state < ETLState.LOADED

@@ -23,6 +23,7 @@ bolt.Config.add_env("test", "C:\\Workspace\\test")
 
 """
 
+import tomllib
 from pathlib import Path
 
 import dotenv
@@ -32,15 +33,22 @@ import dotenv
 # TODO: always-skip-db option for bolt-cmd
 
 
-class Config:
+class Config:  # TODO: refactor to an Env class
     config_dir = Path("~").expanduser() / ".bolt"
     _default_env_line = f"BOLT-DEFAULT={str(config_dir)}\n"
     env_file = config_dir / ".env"
+    # TODO: config_file = config_dir / "boltetl.toml"
     if env_file.exists():
         env_dir = Path(dotenv.dotenv_values(env_file)["BOLT-ACTIVE"])  # type: ignore[arg-type]
     else:
         env_dir = config_dir
     log_dir: Path = env_dir / "logs"
+
+    try:  # TODO: this config object is getting sloppy...
+        with (env_dir / "config.toml").open() as cfg:
+            cli_options = tomllib.loads(cfg.read())["cli"]
+    except Exception:
+        cli_options = {"logo": True, "style": "yellow on black"}
 
     @classmethod
     def init(cls, overwrite=False):

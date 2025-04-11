@@ -1,7 +1,6 @@
 from . import (
     schema,
 )
-from ._download import download
 from ._excel_writer import dict_to_sheets
 from ._logger import IOLogger, make_logger
 from ._rich import df_to_table
