@@ -45,6 +45,80 @@ CONFIG = boltetl.Config.cli_options
 STYLE = CONFIG["style"]
 
 # ============================================================================
+# Base functions
+
+def update_warehouse(
+    console,
+    warehouse,
+    compact=True,
+    quiet=False
+) -> tuple[bool, str, list[tuple[str, Exception]]]:
+    """Core functionality for updating the database warehouse.
+    
+    This function handles the database update process and can be called
+    from multiple command functions.
+    
+    Args:
+        console: The console object for output
+        warehouse: The WAREHOUSE object to update
+        skip_db: Whether to skip the database refresh
+        ignore_errors: Whether to ignore errors during update
+        force: Force update regardless of other conditions
+        quiet: Minimize console output
+        
+    Returns:
+        tuple containing:
+        - success: Boolean indicating if the update was successful
+        - message: Status message about the update
+        - errors: List of (name, exception) tuples for any errors
+    """
+    errors: list[tuple[str, Exception]] = []
+    if quiet:
+        console.quiet = True
+    
+    with console.status("Updating database..."):
+        try:
+            #sql_file_count, compact_msg = warehouse.rebuild(compact=True)
+            sql_file_count = warehouse.rebuild()
+            # TODO: warehouse.create_schema_table()
+            success = True
+            update_message = (
+                f"        [green]Updated[/]\n"
+                f"            SQL Files Executed: {sql_file_count}\n"
+            )
+        except Exception as e:
+            errors.append((warehouse.name, e))
+            update_message = f"        [red]Failed: {warehouse.name}[/]"
+            console.print_exception()
+            success = False
+        finally:
+            console.print(update_message)
+
+    # compact option
+    if compact:
+        with console.status("Compacting..."):
+            try:
+                size_before, size_after = WAREHOUSE.compact()
+                reduction = size_before - size_after
+                percent = (reduction / size_before) * 100 if size_before > 0 else 0
+                compact_message = (
+                    f"        [green]Compacted[/]\n"
+                    f"            {size_before / 1024**2:.5f} MB → "
+                    f"{size_after / 1024**2:.5f} MB "
+                    f"[bright_black](-{percent:.1f}%)[/]"
+                )
+            except Exception as e:
+                errors.append((warehouse.name, e))
+                compact_message = f"        [red]Failed: {warehouse.name}[/]"
+                console.print_exception()
+                success = False
+            finally:
+                console.print(compact_message)
+
+    return errors
+
+
+# ============================================================================
 # App Commands
 
 
@@ -64,18 +138,29 @@ def about() -> None:
 @app.command
 def env(
     option: Literal["list", "add", "activate"] | None = None,
-    env_name: str = "",
+    env_name: str | None = None,
     *args,
     **kwargs,
-):
-    """Manage BoltETL environments."""
+) -> None:
+    """Manage BoltETL environments.
+
+    Args:
+        option (list, add, or activate): Which option to use
+        env_name (str): The name of the environment to operate against
+
+    Example:
+        `python bolt_cli.py env list`
+        `python bolt_cli.py env add NewEnv`  # TODO
+        `python bolt_cli.py env activate MyEnv`
+    """
     if not option:
         console.print()
         return
+    option = option.lower()
 
     # ------------------------------------------------------------------------
     # list
-    if option.lower() == "list":
+    if option == "list":
         envs = boltetl.Config.list_envs()
         current = boltetl.Config.env_dir
         console.print("Available Environments:")
@@ -86,9 +171,13 @@ def env(
                 console.print(f"[green] -> {(env[0])}: {env[1]}[/]")
             else:
                 console.print(f" -  {env[0]}: {env[1]}")
+
+    if not env_name:
+        raise AttributeError("'env_name' argument is required")
+
     # ------------------------------------------------------------------------
     # add
-    elif option.lower() == "add":
+    elif option == "add":
         default = kwargs.get("default", False)
         boltetl.Config.add_env(env_name, kwargs["path"], default)
         console.print(f"Added [green]{env_name}[/]")
@@ -96,7 +185,7 @@ def env(
             console.print("[cyan](Set as default)[/]")
     # ------------------------------------------------------------------------
     # activate
-    elif option.lower() == "activate":
+    elif option == "activate":
         # TODO: warn that env is already active
         boltetl.Config.activate_env(env_name)
         console.print(f"Activated environment: [green]{env_name} ({boltetl.Config.env_dir})[/]")
@@ -105,13 +194,16 @@ def env(
 
 
 @app.command
-def most_recent(datasource_name: str | None = None):
+def most_recent(datasource_name: str | None = None) -> None:
     """List the most recent raw file for a dataset (default all).
 
-    Example
-    -------
-    `python bolt_cli.py most-recent`
-    `python bolt_cli.py most-recent MyDataset`
+    Args:
+        datasource_name (str): The name of the Datasource to get the most recent source file for
+            (defaults to all)
+
+    Example:
+        `python bolt_cli.py most-recent`
+        `python bolt_cli.py most-recent MyDataset`
     """
     boltetl.env.datasources.load_all()
     for datasource_name, datasource in WAREHOUSE.datasource_registry.items():
@@ -148,18 +240,20 @@ def most_recent(datasource_name: str | None = None):
 
 @app.command
 def tool(
-    datasource_name: str, tool_name: str, mode: Literal["run", "info"] = "run", *args, **kwargs
+    datasource_name: str, tool_name: str, option: Literal["run", "info"] = "run", *args, **kwargs
 ) -> Any:
     """Execute Datasource methods exposed as command line tools.
 
     Example:
-        > python bolt_cli.py tool MyDataset Method
+        `python bolt_cli.py tool MyDataset Method`
     """
+    option = option.lower()
     with console.status("Loading datasources/tool..."):
         boltetl.env.datasources.load_all()
         datasource: boltetl.Datasource = WAREHOUSE.datasource_registry[datasource_name]
         tool: Callable = getattr(datasource, tool_name)
-    if mode == "info":
+    if option == "info":
+        console.print(f"[green]{datasource_name} {tool.__name__}[/] [white](tool) info:[/]")
         console.print(f"[yellow]{tool.__doc__}[/]")
         return
     console.print(f"Executing: [green]{datasource_name}.{tool_name}[/]")
@@ -171,18 +265,24 @@ def tool(
 
 
 @app.command
-def report(option: Literal["list", "info", "run"] = "run", rpt_name: str = "", *args, **kwargs):
+def report(
+    option: Literal["list", "info", "run"], rpt_name: str | None = None, *args, **kwargs
+) -> None:
     """List, run, or get info about custom Report objects (with kwargs).
 
-    Use `report-info <report name>` for details about a report.
+    Use `python bolt_cli.py report info <report name>` for details about a report.
 
-        Example
-        -------
+    Args:
+        option (list, info, or run): The option to use
+        rpt_name (str): The name of a Report object to execute or get info for
+
+    Example:
         `python bolt_cli.py report run ParatransitNoShows --start=20250101 --end=20250131`
     """
     # TODO: write: bool = True?
     # TODO: consider an '--update' flag to update report dependencies
     # e.g. python bolt_cli.py report run ParatransitNoShows --update
+    option = option.lower()
     boltetl.env.reports.load_all()
 
     # ------------------------------------------------------------------------
@@ -192,7 +292,7 @@ def report(option: Literal["list", "info", "run"] = "run", rpt_name: str = "", *
         for rpt in WAREHOUSE.report_registry.values():
             console.print(f"        [green]{rpt.name}[/]")
         console.print("For more info, use: ")
-        console.print("[b blue]    `python bolt_cli.py report info <report name>`[/]\n")
+        console.print("[b blue]    `python bolt_cli.py report info <report name>`[/]")
         return
 
     if not rpt_name:
@@ -203,8 +303,7 @@ def report(option: Literal["list", "info", "run"] = "run", rpt_name: str = "", *
     # ------------------------------------------------------------------------
     # info
     if option == "info":
-        console.print("[white]Report Info:[/]")
-        console.print(f"[green]    {rpt.name}[/]")
+        console.print(f"[green]{rpt.name}[/] [white](report) info:[/]")
         console.print(f"[yellow]{rpt.run.__doc__}[/]")
         return
 
@@ -244,7 +343,7 @@ def task(
 
 
 @app.command
-def execution_order():
+def execution_order() -> None:
     """Displays the order that registered SQL files will be executed in."""
     boltetl.env.datasources.load_all()
     file_order: list[str] = [i.path.name for i in WAREHOUSE.execution_plan() if i.path]
@@ -260,18 +359,19 @@ def execution_order():
 
 
 @app.command
-def table(mode: Literal["list", "preview", "schema"], tbl_name: str = "", rows=15, cols=10):
+def table(
+    option: Literal["list", "preview", "schema"], tbl_name: str = "", rows=15, cols=10
+) -> None:
     """Inspect warehoused data (database tables).
 
-    mode: list
-        Shows a list of tables in the warehouse.
-    mode: preview
-        Shows a preview of a given table or view.
-    mode: schema
-        Shows the (polars) schema of the given table or view.
-
+    Args:
+        option (list, preview, or schema): Which option to use
+            ('list' shows a list of tables in the warehouse;
+            'preview' shows a preview of a given table or view;
+            'schema' shows the (polars) schema of the given table or view.)
     """
-    if mode == "list":
+    option = option.lower()
+    if option == "list":
         console.print("Tables in warehouse:")
         tables = WAREHOUSE.list_tables()
         for tbl in tables:
@@ -279,7 +379,7 @@ def table(mode: Literal["list", "preview", "schema"], tbl_name: str = "", rows=1
         return
     if not tbl_name:
         raise AttributeError("A table name is required")
-    elif mode == "preview":
+    elif option == "preview":
         console.print(f"Preview of [cyan]{tbl_name}[/]:")
         pl.Config.set_tbl_rows(rows)
         pl.Config.set_tbl_cols(cols)
@@ -288,7 +388,7 @@ def table(mode: Literal["list", "preview", "schema"], tbl_name: str = "", rows=1
         console.print(data.head(rows))
         console.print(f" Rows: {rows}/{data.shape[0]}  |  Cols: {cols}/{data.shape[1]}\n")
         return
-    elif mode == "schema":
+    elif option == "schema":
         console.print(f"Schema of [cyan]{tbl_name}[/]:")
         data = WAREHOUSE.get_data(tbl_name)
         df = pl.DataFrame({"column": data.columns, "dtype": data.dtypes})
@@ -300,25 +400,93 @@ def table(mode: Literal["list", "preview", "schema"], tbl_name: str = "", rows=1
     return
 
 
+# NEW
+@app.command
+def warehouse(
+    option: Literal["info", "update"],
+    ignore_errors: bool = False,
+    compact: bool = True,
+    quiet: bool = False,
+    bell: bool = False,
+) -> None:
+    """Manage the data warehouse.
+    
+    Args:
+        option (info, update, or compact): Which operation to perform
+        force (bool): Force operations regardless of conditions
+        ignore_errors (bool): Continue execution even if errors occur
+        quiet (bool): Minimize console output
+        bell (bool): Activate console bell when complete
+    
+    Examples:
+        `python bolt_cli.py warehouse update`
+        `python bolt_cli.py warehouse info`
+        `python bolt_cli.py warehouse compact`
+    """
+    option = option.lower()
+    orig_quiet = console.quiet
+    console.quiet = quiet
+
+    console.print(f"Warehouse: [green]{WAREHOUSE.name}[/]")
+
+    # info option
+    if option == "info":
+        console.print(f"Location: {WAREHOUSE.path}")
+        tables = WAREHOUSE.list_tables()
+        console.print(f"Tables: {len(tables)}")
+        #last_updated = WAREHOUSE.get_last_updated()
+        #if last_updated:
+        #    console.print(f"Last updated: {last_updated}")
+        return
+    
+    # update option
+    elif option == "update":
+        # Call the core warehouse update function
+        errors = update_warehouse(
+            console, WAREHOUSE, compact, quiet
+        )
+
+    # Handle errors
+    if len(errors) > 0:
+        if not ignore_errors:
+            for name, err in errors:
+                console.print(f"- [blue]{name}[/]: [red]{err}[/]")
+
+    # Bell notification if requested
+    if bell:
+        console.bell()
+    
+    console.quiet = orig_quiet
+    return
+
+
+
+
+
 @app.command
 def update(
-    datasource_name: str,
-    ignore: list[str] | None = None,
+    datasource_name: str|Literal[".", "db"],
     force=False,
+    ignore: list[str] | None = None,
     skip_db=False,
     ignore_errors=False,
     # download=True,
     quiet=False,
     bell=False,
-):
+) -> None:
     """Updates datasource by name, or all configured datasources ('.').
 
-    Args
-        ...
-        ignore_errors (bool):
+    Args:
+        datasource_name (str): The name of the datasource to update. Or use '.' for all,
+            or 'db' to update only the data warehouse
+        force (bool): Force the update (ignore things that might skip updates)
+        ignore (list[str]): Datasources to ignore (use '--ignore=One --ignore=Two')
+        skip_db (bool): Skip the database refresh
+        ignore_errors (bool): Skips the update of a Datasource if it raises an error
+        quiet (bool): Minimizes printed output
+        bell (bool): Activate the console bell (ding sound) when the process is complete
 
-    Alternatively, update only the data warehouse using 'db'.
-    Examples:
+    Example:
         `python bolt_cli.py update .`  # updates everything
         `python bolt_cli.py update db`  # updates only the database
         `python bolt_cli.py update <datasource>`  # updates <datasource>
@@ -434,6 +602,7 @@ def update(
     if len(datasources) > 0:
         console.print()
 
+    # ========================================================================
     # Update database
     console.print("Updating database:")
     if len(errors) > 0 and not ignore_errors:

@@ -476,11 +476,9 @@ class Warehouse[T]:
         return
 
     def rebuild(self, destroy=False, compact=True):
-        """."""
+        """Execute SQL scripts against the warehouse."""
         # Deletes the DuckDB file if `destroy==True`
         # TODO: Execute all necessary Datasource ETL pipelines (remove from bolt_cli.py?)
-        # Execute all SQL scripts
-        # """Execute SQL scripts against the warehouse."""
         sql_file_count = 0
         with self.connect() as con:
             for sql_obj in self.execution_plan():
@@ -493,6 +491,7 @@ class Warehouse[T]:
                     e.args = (f"{e.args[0]} --> {p}", *e.args[1:])
                     raise e
                 sql_file_count += 1
+        return sql_file_count
 
         # ...
         # Compact
