@@ -7,6 +7,7 @@ from pathlib import Path
 from time import perf_counter_ns
 from typing import Any, Callable, Optional, Self
 
+from duckdb import DataError
 from rich.console import Console
 
 from .._config import Config
@@ -25,6 +26,7 @@ class ValidationError(Exception):
 
 
 class RawDataOrigin(Enum):
+    """Describes the origin of the raw data."""
     INIT = "INIT"
     EXTRACTED = "EXTRACTED"
     FROM_CACHE = "FROM_CACHE"
@@ -33,9 +35,12 @@ class RawDataOrigin(Enum):
 
 class ETLState(Enum):
     INIT = "INIT"
+    DOWNLOADED = "DOWNLOADED"
     EXTRACTED = "EXTRACTED"
     TRANSFORMED = "TRANSFORMED"
     VALIDATED = "VALIDATED"
+    CACHE_WRITTEN = "CACHE_WRITTEN"
+    CACHE_READ = "CACHE_READ"
     LOADED = "LOADED"
 
     def __repr__(self):
@@ -63,7 +68,7 @@ class ETLState(Enum):
 
 
 class Datasource:
-    """."""
+    """Defines a source of data."""
 
     registry: dict[str, Self] = dict()
     failed_to_load: set[tuple[str, Exception]] = set()
@@ -73,6 +78,7 @@ class Datasource:
         name: str,
         source_dir: Path | str = "",
         source_filename: str = "",
+        cache_path: Path | str | None = None,
         metadata: Metadata | None = None,
         options: Options | None = None,
     ):
@@ -81,13 +87,16 @@ class Datasource:
 
         Args:
             name (str): Unique identifier for the datasource
-            source_dir (Path): Path to the directory containing the raw source data
+            source_dir (Path|str): Path to the directory containing the raw source data
             source_filename (str): filename or glob pattern of raw source filename(s)
+            cache_path (Path|str): Optionally set a filepath to cache to
+                (you must define function wrapped with `cache_write_wrapper`)
         """
         # Instance-specific attributes
         self._name = name
-        self.source_dir = source_dir
+        self.source_dir = Path(source_dir) if isinstance(source_dir, str) else source_dir
         self.source_filename = source_filename
+        self.cache_path = Path(cache_path) if isinstance(cache_path, str) else cache_path
 
         # Handle metadata
         self.metadata = metadata if metadata else Metadata()
@@ -110,6 +119,7 @@ class Datasource:
         # State
         self.state = ETLState.INIT
         self.raw_data_origin = RawDataOrigin.INIT
+        self._download_time: tuple[float, float] | None = None
         self._extract_time: tuple[float, float] | None = None
         self._transform_time: tuple[float, float] | None = None
         self._load_time: tuple[float, float] | None = None
@@ -117,12 +127,13 @@ class Datasource:
         self._cache_read_time: tuple[float, float] | None = None
 
         # Processing attributes
+        self.download: Optional[Callable] = None
         self.extract: Optional[Callable] = None
         self.transform: Optional[Callable] = None
+        self.load = self._default_load  # TODO: good idea?
+        self.validate: Optional[Callable] = None
         self.write_cache: Optional[Callable] = None
         self.read_cache: Optional[Callable] = None
-        self.validate: Optional[Callable] = None
-        self.load: Optional[Callable] = None
 
         # Wrapper aliases # TODO: good idea?
         self.E = self.extract_wrapper
@@ -204,15 +215,20 @@ class Datasource:
         """Whether or not `self.data` was read from cache."""
         return self.raw_data_origin == RawDataOrigin.FROM_CACHE
 
-    # @property  # TODO: fix
-    # def has_cached_data(self) -> bool:
-    #    """Whether or not transformed data exists on-disk."""
-    #    return self.options.cache_path and self.options.cache_path.exists()
-
     @property
     def cache_dir(self) -> Path | None:
         """Path to cache directory, if set in options."""
-        return self.options.cache_dir
+        if self.cache_path:
+            return self.cache_path.parent
+        return None
+
+    @property
+    def download_time(self) -> str:
+        """The run time of the download function."""
+        if self._download_time:
+            return time_diff(*self._download_time)
+        return "-1"
+        
 
     @property
     def extract_time(self) -> str:
@@ -250,7 +266,32 @@ class Datasource:
         return "-1"
 
     # ========================================================================
-    # Wrapper methods
+    # Wrapper methods (in pipeline order)
+
+    def download_wrapper(self, download_func: Callable) -> None:
+        """
+        Decorator to register the class's `download` method (optional).
+        
+        The function that this decorator wraps must have the following arguments:
+
+        Args:
+            obj (self): A reference to the object/self
+
+        Returns:
+            None
+        """
+
+        @wraps(download_func)
+        def _download_wrapper(*args, **kwargs) -> None:
+            _start = perf_counter_ns()
+            download_func(self, *args, **kwargs)
+            self.state = ETLState.DOWNLOADED
+            self._download_time = (_start, perf_counter_ns())
+            self.logger.info(f"Download completed (in {self.download_time})")
+            return
+
+        self.download = _download_wrapper
+        return
 
     def extract_wrapper(self, extract_func: Callable) -> None:
         """
@@ -279,9 +320,13 @@ class Datasource:
         """
 
         @wraps(extract_func)
-        def _extract_wrapper(*args, **kwargs) -> None:
+        def _extract_wrapper(**kwargs) -> None:
+            # TODO: `**kwargs` above might sallow passing flags from bolt_cli.py
             _start = perf_counter_ns()
-            extracted_data = extract_func(self)
+            self.logger.info(
+                f"Extracting data from {len(self.source_files)} file(s) in '{self.source_dir}'"
+            )
+            extracted_data = extract_func(self, **kwargs)
             self._raw_data = extracted_data
             self._extract_time = (_start, perf_counter_ns())
             self.state = ETLState.EXTRACTED
@@ -410,6 +455,28 @@ class Datasource:
         _data_wrapper()
         return
 
+    def validate_wrapper(self, validate_func: Callable) -> None:
+        """
+        Decorator to register the class's `validate` method.
+
+        The function that this decorator wraps must have the following arguments:
+
+        Args:
+            arg (type): Desc
+
+        Returns:
+            Callable: Decorated function
+        """
+
+        @wraps(validate_func)
+        def _validate_wrapper(*args, **kwargs) -> None:
+            validate_func(self)  # Execute the validation function
+            self.state = ETLState.VALIDATED
+            return
+
+        # self.cache = _validate_wrapper
+        return
+
     def cache_write_wrapper(self, cache_write_func: Callable) -> None:
         """
         Decorator to register the class's `cache` method.
@@ -425,9 +492,16 @@ class Datasource:
 
         @wraps(cache_write_func)
         def _cache_write_wrapper(*args, **kwargs) -> None:
+            if not (self.write_cache and self.cache_path):
+                raise AttributeError(
+                    f"`cache_path` attribute and `write_cache` function must both exist"
+                )
+
             _start = perf_counter_ns()
+            self.logger.info(f"Caching data to '{self.cache_dir}'")
             cache_write_func(self)
             self._cache_write_time = (_start, perf_counter_ns())
+            self.state = ETLState.CACHE_WRITTEN
             # TODO: write metadata JSON file
             self.logger.info(f"Cached transformed data (in {self.cache_write_time})")
             return
@@ -459,34 +533,13 @@ class Datasource:
                 raise ValueError("Cache-reading function must return data")
             self._cache_read_time = (_start, perf_counter_ns())
             self.logger.info(f"Cached data read (in {self.cache_read_time})")
-            self.state = ETLState.TRANSFORMED
+            #self.state = ETLState.TRANSFORMED
+            self.state = ETLState.CACHE_READ
             self.raw_data_origin = RawDataOrigin.FROM_CACHE
             # TODO: read metadata JSON file
             return
 
         self.read_cache = _cache_read_wrapper
-        return
-
-    def validate_wrapper(self, validate_func: Callable) -> None:
-        """
-        Decorator to register the class's `validate` method.
-
-        The function that this decorator wraps must have the following arguments:
-
-        Args:
-            arg (type): Desc
-
-        Returns:
-            Callable: Decorated function
-        """
-
-        @wraps(validate_func)
-        def _validate_wrapper(*args, **kwargs) -> None:
-            validate_func(self)  # Execute the validation function
-            self.state = ETLState.VALIDATED
-            return
-
-        # self.cache = _validate_wrapper
         return
 
     def tool(self, tool_func: Callable) -> None:
@@ -535,19 +588,19 @@ class Datasource:
         """Utility method for passing a rich.console.Console to the tool."""
         return tool_kwargs.get("console", Console())
 
-    # def read_warehouse(self) -> None:
-    #     """Load the processed data from the warehouse/database."""
-    #     # TODO: should we enable users to access end-of-lifecycle data as a 'source'?
-    #     import boltetl.env
-    #     df: pl.DataFrame = boltetl.env.warehouse.get_data(self.name)
-    #     self._data = df
-    #     self.state = ETLState.READ_FROM_WAREHOUSE
-    #     return
-
     # ========================================================================
     # Update method
 
-    def update(self, warehouse, force=False) -> None:  # TODO: consider 'execute_pipeline()'
+    def update(
+        self,
+        warehouse,
+        download=True,
+        read_cache=True,
+        validate=True,
+        write_cache=True,
+        console=None,
+        **kwargs
+    ) -> None:
         """
         Executes the ETL operations.
 
@@ -561,74 +614,113 @@ class Datasource:
             ValueError: If extract function is not defined
             ValidationError: If any validation fails
         """
-        self.logger.info(f"Starting update for {self._name}")
-        self.logger.debug(f"Metadata:\n{self.metadata.to_json(json_indent=4)}")
-        self.logger.debug(f"Options:\n{self.options.to_json()}")  # TODO: json_indent=4
+        _status = f"{self.name}: Setting up..."
+        with console.status(f"      [cyan]{_status}[/]"):
+            self.logger.info(f"Starting update for {self._name}")
+            self.logger.debug(f"kwargs={kwargs}")
+            self.logger.debug(f"Metadata:\n{self.metadata.to_json(json_indent=4)}")
+            self.logger.debug(f"Options:\n{self.options.to_json()}")  # TODO: json_indent=4
+            if console:
+                self.logger.debug(f"Console passed as argument (quiet={console.quiet})")
+            else:
+                from rich.console import Console
+                console = Console(quiet=True)
+                self.logger.debug(f"New console created (quiet={console.quiet})")
 
-        # Check that `extract` method is set
-        # Unless directly set with `data_wrapper`
-        if not self.extract or self.state >= ETLState.EXTRACTED:
-            extract_error_msg = "An `extract` function is required"
-            self.logger.critical(extract_error_msg)
-            raise ValueError(extract_error_msg)
+            # Check that `extract` method is set
+            # Unless directly set with `data_wrapper`
+            if not self.extract or self.state >= ETLState.EXTRACTED:
+                extract_error_msg = "An `extract` function is required"
+                self.logger.critical(extract_error_msg)
+                raise ValueError(extract_error_msg)
 
         # --------------------------------------------------------------------
-        # Read cached data if a read_cache function is defined, and not force
-        if self.read_cache and force is False:
-            self.logger.info(f"Reading cached file(s) from '{self.cache_dir}'")
-            self.read_cache()
-        # if self.raw_data_origin == RawDataOrigin.EXTRACTED:
-        # TODO:
-        # elif directly-set ...
+        # Download (optional)
+        _status = f"{self.name}: Downloading..."
+        with console.status(f"      [cyan]{_status}[/]"):
+            if self.download:
+                if download:  # arg
+                    self.logger.info(_status)
+                    self.download(**kwargs)
+                else:
+                    self.logger.info("Download skipped")
+
+        # --------------------------------------------------------------------
+        # Extract / Read Cache
+        if self.read_cache and read_cache:  # arg
+            _status = f"{self.name}: Reading cache..."
+            with console.status(f"      [cyan]{_status}[/]"):
+                self.logger.info(_status)
+                self.read_cache()  # Sets state to TRANSFORMED
         else:
-            self.logger.info(
-                f"Extracting data from {len(self.source_files)} file(s) in '{self.source_dir}'"
-            )
-            self.extract()
+            _status = f"{self.name}: Extracting..."
+            with console.status(f"      [cyan]{_status}[/]"):
+                self.logger.info(_status)
+                self.extract(**kwargs)
 
         # --------------------------------------------------------------------
         # Transform data if `transform` function was defined
-        if self.transform and self.state < ETLState.TRANSFORMED:
-            self.logger.info("Applying transformation(s)")
-            self.transform()
-        # else:
-        #    self.logger.warning(
-        #        "No transform function defined; setting `data` to `raw_data`"
-        #    )
-        #    self._data = self._raw_data
-
-        # --------------------------------------------------------------------
-        # Optionally write transformed data to cache (disk)
-        if self.raw_data_origin != RawDataOrigin.FROM_CACHE:
-            if self.write_cache is None and self.options.cache_dir:
+        _status = f"{self.name}: Transforming..."
+        with console.status(f"      [cyan]{_status}[/]"):
+            if self.transform and self.state < ETLState.TRANSFORMED:
+                self.logger.info(_status)
+                self.transform()
+            # Support the lack of transform 
+            elif not self.transform and self.state < ETLState.TRANSFORMED:
                 self.logger.warning(
-                    f"No `write_cache` function specified; but `options.cache_dir` was: '{self.options.cache_dir}'"
+                    "No transform function defined; setting `data` to `raw_data`"
                 )
-            elif self.write_cache and self.options.cache_dir is None:
-                self.logger.warning(
-                    "`write_cache` function specified, but no value set to `options.cache_dir`"
-                )
-            elif self.write_cache and self.options.cache_dir:
-                self.logger.info(f"Caching data to '{self.options.cache_dir}'")
-                self.write_cache()
-                # Else, no caching
+                self._data = self._raw_data
 
         # --------------------------------------------------------------------
         # Validate
-        # TODO: validation
-        if self.validate:
-            self.logger.info("Validating data")
-            self.validate()
+        _status = f"{self.name}: Validating..."
+        with console.status(f"      [cyan]{_status}[/]"):
+            if self.validate and validate:  # arg
+                self.logger.info(_status)
+                self.validate()
+
+        # --------------------------------------------------------------------
+        # Cache (Write)
+        # Optionally write transformed data to cache (disk)
+        _status = f"{self.name}: Writing cache..."
+        with console.status(f"      [cyan]{_status}[/]"):
+            if self.write_cache and self.raw_data_origin != RawDataOrigin.FROM_CACHE and write_cache:
+                self.logger.info(_status)
+                self.write_cache()
 
         # --------------------------------------------------------------------
         # Load
-        if self.load:
-            self.logger.info("Loading data")
-            self.load(warehouse)
-        else:
-            self._default_load(warehouse)
+        _status = f"{self.name}: Loading..."
+        with console.status(f"      [cyan]{_status}[/]"):
+            if self.load:
+                self.logger.info(_status)
+                self.load(warehouse)
+            else:
+                self.logger.info("Loading (using default function)")
+                self._default_load(warehouse)
 
-        self.logger.info("Update completed")
+        # --------------------------------------------------------------------
+        # Confirm load success
+        _status = f"{self.name}: Confirming load..."
+        with console.status(f"      [cyan]{_status}[/]"):
+            tables = set(warehouse.list_tables())
+            if isinstance(self.data, (tuple, list, dict)):
+                if isinstance(self.data, (tuple, list)):
+                    names = set([i[0] for i in self.data])
+                else:
+                    names = set([i for i in self.data.keys()])
+                if not names.issubset(tables):
+                    self.logger.critical("FAILURE: Table load could not be confirmed")
+                    raise DataError(f"Not all tables ({len(names)}) exist after attempting load")
+            elif self.name not in tables:
+                self.logger.critical("FAILURE: Table load could not be confirmed")
+                raise DataError(f"Table '{self.name}' does not exist after attempting load")
+            self.logger.info("Table load confirmed")
+
+        _status = f"{self.name}: Complete"
+        with console.status(f"      [cyan]{_status}[/]"):
+            self.logger.info(f"Updated '{self.name}'!")
         # --------------------------------------------------------------------
         return
 

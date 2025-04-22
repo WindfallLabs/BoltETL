@@ -59,6 +59,7 @@ class Warehouse[T]:
         self._is_new = not self.path.exists()  # BUG: can't use :memory:
         self._sql_functions: set[Callable] = set()
         self._scripts: list[str] = []
+        self._plt_registry: dict[str, Callable] = {}
 
         if create_on_init:
             with self.connect() as con:
@@ -143,6 +144,42 @@ class Warehouse[T]:
             return
 
         return _script_wrapper()
+
+    def post_load_transform(self, table_name: str, dependencies: list[str]):
+        """
+        Decorator for registering a post-load (warehouse) transformation (PLT).
+
+        Args:
+            table_name (str): The name of the table created by the wrapped transformation function
+            dependencies (list[str]): The names of tables used to create the resulting table
+        """
+
+        def _plt_wrapper(func):
+            # Set the dependencies (executed at definition)
+            self._plt_registry.update({f"{table_name}": dependencies})
+
+            @wraps(func)
+            def wrapped_function(*args, **kwargs):
+                """Wrapper."""
+                tables = {}
+                for dep in dependencies:
+                    #tables[dep] = wh.get_data(dep)
+                    tables[dep] = "TEST"
+                # Execute the user-function
+                result = func(self, tables, *args, **kwargs)
+                # Load the table if the user didn't handle it already
+                if table_name not in self.list_tables():
+                    with self.connect() as con:
+                        con.sql(f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM result")
+
+                return result
+
+            # Register the function
+            self._post_load_transformations[table_name] = wrapped_function
+
+            return wrapped_function
+
+        return _plt_wrapper
 
     # ========================================================================
     # Public Methods
@@ -230,7 +267,7 @@ class Warehouse[T]:
         # Delete the old db
         self.path.unlink()
         # Reset the warehouse's path to the new/compacted db
-        self._path = new_db.rename(new_db.parent.joinpath(name))  # TODO: should work
+        self._path = new_db.rename(new_db.parent.joinpath(name))
         new_size = self.path.stat().st_size / 1024
         return (old_size, new_size)
 
@@ -240,7 +277,8 @@ class Warehouse[T]:
             warn("User-defined objects not loaded. Use `import boltetl.env` to resolve.")
 
         default_duckdb_tables = {"duckdb_tables", "duckdb_views"}
-        script_dependencies = {}
+        dependencies = {}
+        # Process SQL script dependencies
         for name, obj in self.sql_registry.items():
             clean_deps = set()
             deps: set[str] = {d for d in obj.dependencies if d not in self.ignored_dependencies}
@@ -252,8 +290,10 @@ class Warehouse[T]:
                 elif dep in default_duckdb_tables:  # TODO:
                     continue
                 clean_deps.add(dep)
-            script_dependencies[name] = clean_deps
-        sorter = TopologicalSorter(script_dependencies)
+            dependencies[name] = clean_deps
+        # Add post-load transformation dependencies
+        dependencies.update(self._plt_registry)
+        sorter = TopologicalSorter(dependencies)
         sorted_graph: tuple[str] = tuple(sorter.static_order())
         if small:
             return sorted_graph
@@ -261,7 +301,7 @@ class Warehouse[T]:
         full_graph: list[tuple[str, str, set[str]]] = []
         g: str
         for g in sorted_graph:
-            # Get from SQL registry or Datasource registry
+            # Get from SQL registry or Datasource registry  # TODO: plt's - likely to cause errors
             obj = self.sql_registry.get(g, self.datasource_registry.get(g, None))
             deps = getattr(obj, "dependencies", set())
             t: str
@@ -492,14 +532,6 @@ class Warehouse[T]:
                     raise e
                 sql_file_count += 1
         return sql_file_count
-
-        # ...
-        # Compact
-        compact_msg = "[yellow]Not compacted[/]"
-        if compact:
-            compact_sizes = self.compact()
-            compact_msg = f"Compacted Database: {compact_sizes[0]} KB -> {compact_sizes[1]} KB"
-        return sql_file_count, compact_msg  # TODO: ...
 
     # ========================================================================
     # Dunders

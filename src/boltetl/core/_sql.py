@@ -7,7 +7,6 @@ from typing import Self
 from ._options import Options
 
 REGEX = re.compile(r"(?:FROM|JOIN|UPDATE|INSERT INTO|PIVOT) (\b\w+\b)")
-# IGNORE_REGEX = re.compile(r"(?:WITH) (\b\w+\b)")
 IGNORE_REGEX = re.compile(r"(\w+)\s+?\bAS\b")
 
 

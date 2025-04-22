@@ -76,7 +76,7 @@ def update_warehouse(
     if quiet:
         console.quiet = True
     
-    with console.status("Updating database..."):
+    with console.status("      Updating database..."):
         try:
             #sql_file_count, compact_msg = warehouse.rebuild(compact=True)
             sql_file_count = warehouse.rebuild()
@@ -84,7 +84,7 @@ def update_warehouse(
             success = True
             update_message = (
                 f"        [green]Updated[/]\n"
-                f"            SQL Files Executed: {sql_file_count}\n"
+                f"            SQL Files Executed: {sql_file_count}"
             )
         except Exception as e:
             errors.append((warehouse.name, e))
@@ -96,7 +96,7 @@ def update_warehouse(
 
     # compact option
     if compact:
-        with console.status("Compacting..."):
+        with console.status("      Compacting..."):
             try:
                 size_before, size_after = WAREHOUSE.compact()
                 reduction = size_before - size_after
@@ -116,6 +116,80 @@ def update_warehouse(
                 console.print(compact_message)
 
     return errors
+
+
+# ============================================================================
+# Shell (idea)
+
+from cmd import Cmd
+
+
+class Prompt(Cmd):
+    prompt = "BoltETL> "
+    intro = "BoltETL shell started!\n"
+
+    def do_exit(self, inp):
+        print("Bye")
+        return True
+
+    def do_quit(self, inp):
+        return self.do_exit(inp)
+
+    def do_q(self, inp):
+        return self.do_exit(inp)
+
+    def do_export(self, inp):
+        ds, ft = inp.split(" ")
+        data = WAREHOUSE.get_data(ds)
+        # TODO: ...
+        return
+
+    def do_extract(self, inp):
+        with console.status("Initializing..."):
+            boltetl.env.datasources.load_all()
+        with console.status("Extracting..."):
+            ds = WAREHOUSE.datasource_registry[inp]
+            ds.extract()
+        return
+
+    def do_transform(self, inp):
+        with console.status("Transforming..."):
+            ds = WAREHOUSE.datasource_registry[inp]
+            ds.transform()
+        return
+
+    def do_load(self, inp):
+        with console.status("Loading..."):
+            ds = WAREHOUSE.datasource_registry[inp]
+            ds.load(WAREHOUSE)
+        return
+
+    def do_show_datasource(self, inp):
+        with console.status("Displaying..."):
+            ds = WAREHOUSE.datasource_registry[inp]
+        console.print(ds.data)
+        return
+
+    def do_sql(self, query: str):
+        with WAREHOUSE.connect() as con:
+            data = con.sql(query).pl()
+        pl.Config.set_tbl_cols(round(console.width/20))
+        console.print(data)
+        return
+
+    def do_list_tables(self, inp):
+        console.print(WAREHOUSE.list_tables())
+        return
+
+    def do_refresh(self, inp):
+        update_warehouse(console, WAREHOUSE)
+        return
+
+
+@app.command
+def shell() -> None:
+    Prompt().cmdloop()
+
 
 
 # ============================================================================
@@ -171,6 +245,7 @@ def env(
                 console.print(f"[green] -> {(env[0])}: {env[1]}[/]")
             else:
                 console.print(f" -  {env[0]}: {env[1]}")
+        return
 
     if not env_name:
         raise AttributeError("'env_name' argument is required")
@@ -466,15 +541,26 @@ def warehouse(
 @app.command
 def update(
     datasource_name: str|Literal[".", "db"],
-    force=False,
+    skip: bool = True,
+    # ===== ETL Controls (defaults are for full-update) =====
+    download: bool = True,
+    read_cache: bool = False,  # False forces extract and transform
+    validate: bool = True,
+    write_cache: bool = True,
+    # ===== Other Controls =====
+    lazy: bool = False,
     ignore: list[str] | None = None,
-    skip_db=False,
-    ignore_errors=False,
-    # download=True,
-    quiet=False,
-    bell=False,
+    skip_db: bool = False,
+    compact: bool = True,
+    ignore_errors: bool = False,
+    quiet: bool = False,
+    bell: bool = False,
+    **kwargs
 ) -> None:
     """Updates datasource by name, or all configured datasources ('.').
+
+    # NOTE!! By default, update is eager (it does as much work it can to complete the job)
+
 
     Args:
         datasource_name (str): The name of the datasource to update. Or use '.' for all,
@@ -485,16 +571,24 @@ def update(
         ignore_errors (bool): Skips the update of a Datasource if it raises an error
         quiet (bool): Minimizes printed output
         bell (bool): Activate the console bell (ding sound) when the process is complete
+        kwargs (dict): Use custom flags (e.g. `--flag=True`) and pass them to your functions as **kwargs
 
     Example:
         `python bolt_cli.py update .`  # updates everything
         `python bolt_cli.py update db`  # updates only the database
         `python bolt_cli.py update <datasource>`  # updates <datasource>
     """
+    if lazy:
+        skip = False
+        download = False
+        read_cache = True
+
+    _args = locals()
     if quiet:
         console.print("[black b]Updating...[/]")
         console.quiet = True
-    boltetl.env.datasources.load_all()
+    with console.status("Importing Datasources..."):
+        boltetl.env.datasources.load_all()
     if not ignore:
         ignore = []
     # Determine datasources to process
@@ -528,17 +622,13 @@ def update(
     # Process datasources
     if datasources:
         tables_loaded = 0
-        update_msg = "Updating datasources:"
-        if force:
-            update_msg = "Updating datasources (force=True):"
-        console.print(update_msg)
+        console.print(f"Updating datasources ({len(datasources)}):")
 
         # Log to each Datasource's log
         for d in datasources:
             d.logger.info("============== Bolt-CMD ==============")
             d.logger.info(f"Started update for {d.name} (by {USER})")
-            # d.logger.info(f"Args: `--force={force} --download={download}`")
-            d.logger.info(f"Args: `--force={force}`")
+            d.logger.info(f"Args: `{_args}`")
 
             if d.name in ignore:
                 console.print(f"        [yellow]Skipped: {d.name} ([i]ignored[/i])[/]")
@@ -551,7 +641,8 @@ def update(
             # HASH
             # Do recently updated check
             do_update: bool = True
-            if not force:
+            #if not force:
+            if skip:
                 d.logger.info("Comparing hashes")
                 do_update = WAREHOUSE.compare_hashes(d)
 
@@ -563,28 +654,36 @@ def update(
             # ----------------------------------------------------------------
             # UPDATE
             try:
-                with console.status(f"[cyan]      Updating {d.name}...[/]"):
-                    d.logger.info("Calling update command")
-                    # TODO: consider `d.extract()`, `d.transform()`, and `d.load()` individually
-                    d.update(WAREHOUSE, force)  # TODO: reinstate download option
-                    # TODO: handle misc post-load callbacks
-                    # Confirm load success
-                    if (
-                        len(d.data) == 1 and d.name not in WAREHOUSE.list_tables()
-                    ):  # TODO: not the best way to measure...
-                        d.logger.critical("FAILURE: Table load could not be confirmed")
-                        raise duckdb.DataError("Table does not exist after attempting load")
-                    d.logger.info("Table load confirmed")
-                    if d.raw_data_origin == RawDataOrigin.FROM_CACHE:
-                        console.print(
-                            f"        [green]Updated: {d.name}[/]  [bright_black](C:{d.cache_read_time} | L:{d.load_time})[/]"
-                        )
-                    else:
-                        console.print(
-                            f"        [green]Updated: {d.name}[/]  [bright_black](E:{d.extract_time} | T:{d.transform_time} | L:{d.load_time})[/]"
-                        )
-                    d.logger.info("Update complete")
-                    WAREHOUSE.logger.info(f"Loaded {d.name}")
+                #with console.status(f"[cyan]      Updating {d.name}...[/]"):
+                d.logger.info("Calling update command")
+                # ===== Do the Update =====
+                d.update(
+                    WAREHOUSE,
+                    download=download,
+                    read_cache=read_cache,
+                    validate=validate,
+                    write_cache=write_cache,
+                    console=console,
+                    **kwargs
+                )
+                # TODO: handle misc post-load callbacks
+                # Confirm load success
+                # with console.status(f"{d.name}: Confirming load..."):
+                #     if (
+                #         len(d.data) == 1 and d.name not in WAREHOUSE.list_tables()
+                #     ):  # TODO: not the best way to measure...
+                #         d.logger.critical("FAILURE: Table load could not be confirmed")
+                #         raise duckdb.DataError("Table does not exist after attempting load")
+                #     d.logger.info("Table load confirmed")
+                if d.raw_data_origin == RawDataOrigin.FROM_CACHE:
+                    console.print(
+                        f"        [green]Updated: {d.name}[/]  [bright_black](C:{d.cache_read_time} | L:{d.load_time})[/]"
+                    )
+                else:
+                    console.print(
+                        f"        [green]Updated: {d.name}[/]  [bright_black](E:{d.extract_time} | T:{d.transform_time} | L:{d.load_time})[/]"
+                    )
+                WAREHOUSE.logger.info(f"Loaded {d.name}")
             except Exception as e:
                 d.logger.critical(f"{e}")
                 errors.append((d.name, e))
@@ -592,7 +691,7 @@ def update(
                 if not ignore_errors:
                     raise e
             finally:
-                d.logger.info("End")
+                d.logger.info("Complete")
             # ----------------------------------------------------------------
             tables_loaded += 1
         console.print(f"    Tables Loaded: {tables_loaded}")
@@ -614,20 +713,7 @@ def update(
         else:
             console.print("        [yellow]Skipped ([i]ignored[/i])[/]")
     else:
-        with console.status("Updating database:"):
-            try:
-                sql_file_count, compact_msg = WAREHOUSE.rebuild(compact=True)
-                # TODO: WAREHOUSE.create_schema_table()
-                db_msg = (
-                    f"        [green]Updated: {WAREHOUSE.name}[/]\n"
-                    f"            SQL Files Executed: {sql_file_count}\n"
-                    f"            {compact_msg}"
-                )
-            except Exception as e:
-                errors.append((WAREHOUSE.name, e))
-                db_msg = f"        [red]Failed: {WAREHOUSE.name}[/]"
-                console.print_exception()
-        console.print(db_msg)
+        update_warehouse(console, WAREHOUSE, compact=compact)
 
     # Print error info
     err_cnt = f"{len(errors) + loading_error_cnt}"

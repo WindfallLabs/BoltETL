@@ -36,8 +36,6 @@ def data(obj):
         )
         .with_columns(
             pl.col("HolidayName")
-            .str.replace("(observed)", "")
-            .str.strip_chars(" ()")
             .alias("Holiday")
         )
         .sort(pl.col("Date"))
@@ -85,6 +83,8 @@ def data(obj):
                 .map_elements(lambda x: {1: 3, 2: 4, 3: 1, 4: 2}[x], return_dtype=pl.Int8)
                 .alias("FiscalQuarter")
             ),
+            # Day
+            pl.col("Date").dt.strftime("%d").cast(pl.Int32).alias("Day"),
             # Day Abbr
             pl.col("Date").dt.strftime("%a").alias("DayAbbr"),
             # Day Type
@@ -105,6 +105,7 @@ def data(obj):
             "Month",
             "MonthName",
             "MonthAbbr",
+            "Day",
             "DayName",
             "DayAbbr",
             "DayType",
