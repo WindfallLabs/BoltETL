@@ -34,10 +34,7 @@ def data(obj):
             schema=["Date", "HolidayName"],
             orient="row",
         )
-        .with_columns(
-            pl.col("HolidayName")
-            .alias("Holiday")
-        )
+        .with_columns(pl.col("HolidayName").alias("Holiday"))
         .sort(pl.col("Date"))
     )
 

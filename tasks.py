@@ -18,3 +18,9 @@ def clean(c):
     call("uvx ruff check --select I --fix .")
     call("uvx ruff format .")
     return
+
+
+@task
+def typing(c):
+    call("mypy .")
+    return

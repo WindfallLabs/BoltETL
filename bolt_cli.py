@@ -6,22 +6,23 @@ For more info, use:
 
 import datetime as dt
 import time
+from cmd import Cmd
+from collections.abc import Callable
 from getpass import getuser
 from pathlib import Path
 from platform import node
-from typing import Any, Callable, Literal
+from typing import Any, Final, Literal
 
 t_init_start = time.perf_counter_ns()
 
 import cyclopts  # noqa: E402
-import duckdb  # noqa: E402
 import polars as pl  # noqa: E402
 from rich.console import Console  # noqa: E402
 from rich.markdown import Markdown  # noqa: E402
 
 import boltetl  # noqa: E402
 import boltetl.env  # noqa: E402
-from boltetl.core._datasource import RawDataOrigin  # noqa: E402
+from boltetl.core import RawDataOrigin  # noqa: E402
 from boltetl.utils import time_diff  # noqa: E402
 
 __version__ = boltetl.__version__
@@ -34,30 +35,28 @@ logo = """┏━━┓     ┏┓ ┏┓ ┏━━━┓┏━━━━┓┏┓
 ┃┗━┛┃┃┗┛┃┃┗┓┃┗┓┃┗━━┓ ┏┛┗┓ ┃┗━┛┃
 ┗━━━┛┗━━┛┗━┛┗━┛┗━━━┛ ┗━━┛ ┗━━━┛"""
 
-console = Console()
-app = cyclopts.App()
+console: Final[Console] = Console()
+app: Final[cyclopts.App] = cyclopts.App()
 
 ENV = boltetl.Config.env_dir
-SCRIPT = Path(__file__).name
-WAREHOUSE: boltetl.Warehouse = boltetl.env.warehouse
-USER = f"{node()}/{getuser()}"
-CONFIG = boltetl.Config.cli_options
-STYLE = CONFIG["style"]
+SCRIPT: Final = Path(__file__).name
+WAREHOUSE: Final[boltetl.Warehouse] = boltetl.env.warehouse  # typing: ignore attr-defined
+USER: Final = f"{node()}/{getuser()}"
+CONFIG: Final = boltetl.Config.cli_options
+STYLE: Final = CONFIG["style"]
 
 # ============================================================================
 # Base functions
 
+
 def update_warehouse(
-    console,
-    warehouse,
-    compact=True,
-    quiet=False
-) -> tuple[bool, str, list[tuple[str, Exception]]]:
+    console, warehouse, compact=True, quiet=False
+) -> list[tuple[str, Exception]]:
     """Core functionality for updating the database warehouse.
-    
+
     This function handles the database update process and can be called
     from multiple command functions.
-    
+
     Args:
         console: The console object for output
         warehouse: The WAREHOUSE object to update
@@ -65,7 +64,7 @@ def update_warehouse(
         ignore_errors: Whether to ignore errors during update
         force: Force update regardless of other conditions
         quiet: Minimize console output
-        
+
     Returns:
         tuple containing:
         - success: Boolean indicating if the update was successful
@@ -75,22 +74,20 @@ def update_warehouse(
     errors: list[tuple[str, Exception]] = []
     if quiet:
         console.quiet = True
-    
+
     with console.status("      Updating database..."):
         try:
-            #sql_file_count, compact_msg = warehouse.rebuild(compact=True)
+            # sql_file_count, compact_msg = warehouse.rebuild(compact=True)
             sql_file_count = warehouse.rebuild()
             # TODO: warehouse.create_schema_table()
             success = True
             update_message = (
-                f"        [green]Updated[/]\n"
-                f"            SQL Files Executed: {sql_file_count}"
+                f"        [green]Updated[/]\n" f"            SQL Files Executed: {sql_file_count}"
             )
         except Exception as e:
             errors.append((warehouse.name, e))
             update_message = f"        [red]Failed: {warehouse.name}[/]"
             console.print_exception()
-            success = False
         finally:
             console.print(update_message)
 
@@ -111,7 +108,6 @@ def update_warehouse(
                 errors.append((warehouse.name, e))
                 compact_message = f"        [red]Failed: {warehouse.name}[/]"
                 console.print_exception()
-                success = False
             finally:
                 console.print(compact_message)
 
@@ -120,8 +116,6 @@ def update_warehouse(
 
 # ============================================================================
 # Shell (idea)
-
-from cmd import Cmd
 
 
 class Prompt(Cmd):
@@ -173,7 +167,7 @@ class Prompt(Cmd):
     def do_sql(self, query: str):
         with WAREHOUSE.connect() as con:
             data = con.sql(query).pl()
-        pl.Config.set_tbl_cols(round(console.width/20))
+        pl.Config.set_tbl_cols(round(console.width / 20))
         console.print(data)
         return
 
@@ -189,7 +183,6 @@ class Prompt(Cmd):
 @app.command
 def shell() -> None:
     Prompt().cmdloop()
-
 
 
 # ============================================================================
@@ -211,7 +204,7 @@ def about() -> None:
 
 @app.command
 def env(
-    option: Literal["list", "add", "activate"] | None = None,
+    option: str | Literal["list", "add", "activate"] | None = None,
     env_name: str | None = None,
     *args,
     **kwargs,
@@ -294,6 +287,7 @@ def most_recent(datasource_name: str | None = None) -> None:
         stale_after = 20  # TODO:
         stale_color = "green"
 
+        age: tuple[int, str]
         if t.days > 0:
             age = (t.days, "days")
             if age[0] >= stale_after - 5:
@@ -302,7 +296,7 @@ def most_recent(datasource_name: str | None = None) -> None:
             if age[0] > stale_after:
                 stale_color = "red"
         else:
-            age = (round(t.total_seconds() / 3600, 1), "hours")
+            age = (int(round(t.total_seconds() / 3600, 1)), "hours")
 
         console.print(f"[cyan]{datasource_name}[/]")
         console.print(f"Filename: '{recent[0]}'")
@@ -315,7 +309,11 @@ def most_recent(datasource_name: str | None = None) -> None:
 
 @app.command
 def tool(
-    datasource_name: str, tool_name: str, option: Literal["run", "info"] = "run", *args, **kwargs
+    option: str | Literal["list", "info", "run"],
+    datasource_name: str,
+    tool_name: str | None = None,
+    *args,
+    **kwargs,
 ) -> Any:
     """Execute Datasource methods exposed as command line tools.
 
@@ -326,22 +324,32 @@ def tool(
     with console.status("Loading datasources/tool..."):
         boltetl.env.datasources.load_all()
         datasource: boltetl.Datasource = WAREHOUSE.datasource_registry[datasource_name]
-        tool: Callable = getattr(datasource, tool_name)
-    if option == "info":
+        if option != "list":
+            tool: Callable = getattr(datasource, tool_name)
+    if option == "list":
+        console.print(f"[green]{datasource_name}[/] [white]available tools:[/]")
+        console.print(f"{datasource.tool_names}")
+        return
+    elif option == "info":
         console.print(f"[green]{datasource_name} {tool.__name__}[/] [white](tool) info:[/]")
-        console.print(f"[yellow]{tool.__doc__}[/]")
+        console.print(f"    [yellow]{tool.__doc__}[/]")
         return
     console.print(f"Executing: [green]{datasource_name}.{tool_name}[/]")
     # Pass console to tool in kwargs
     kwargs.update({"console": console})
     result = tool(*args, **kwargs)
+    console.print("Result:")
+    console.print(f"    [yellow]{result}[/]")
     console.print("Done")
     return result
 
 
 @app.command
 def report(
-    option: Literal["list", "info", "run"], rpt_name: str | None = None, *args, **kwargs
+    option: str | Literal["list", "info", "run"],
+    rpt_name: str | None = None,
+    *args,
+    **kwargs,
 ) -> None:
     """List, run, or get info about custom Report objects (with kwargs).
 
@@ -435,7 +443,10 @@ def execution_order() -> None:
 
 @app.command
 def table(
-    option: Literal["list", "preview", "schema"], tbl_name: str = "", rows=15, cols=10
+    option: str | Literal["list", "preview", "schema"],
+    tbl_name: str = "",
+    rows=15,
+    cols=10,
 ) -> None:
     """Inspect warehoused data (database tables).
 
@@ -478,21 +489,21 @@ def table(
 # NEW
 @app.command
 def warehouse(
-    option: Literal["info", "update"],
+    option: str | Literal["info", "update"],
     ignore_errors: bool = False,
     compact: bool = True,
     quiet: bool = False,
     bell: bool = False,
 ) -> None:
     """Manage the data warehouse.
-    
+
     Args:
         option (info, update, or compact): Which operation to perform
         force (bool): Force operations regardless of conditions
         ignore_errors (bool): Continue execution even if errors occur
         quiet (bool): Minimize console output
         bell (bool): Activate console bell when complete
-    
+
     Examples:
         `python bolt_cli.py warehouse update`
         `python bolt_cli.py warehouse info`
@@ -509,17 +520,15 @@ def warehouse(
         console.print(f"Location: {WAREHOUSE.path}")
         tables = WAREHOUSE.list_tables()
         console.print(f"Tables: {len(tables)}")
-        #last_updated = WAREHOUSE.get_last_updated()
-        #if last_updated:
+        # last_updated = WAREHOUSE.get_last_updated()
+        # if last_updated:
         #    console.print(f"Last updated: {last_updated}")
         return
-    
+
     # update option
     elif option == "update":
         # Call the core warehouse update function
-        errors = update_warehouse(
-            console, WAREHOUSE, compact, quiet
-        )
+        errors: list[tuple[str, Exception]] = update_warehouse(console, WAREHOUSE, compact, quiet)
 
     # Handle errors
     if len(errors) > 0:
@@ -530,17 +539,14 @@ def warehouse(
     # Bell notification if requested
     if bell:
         console.bell()
-    
+
     console.quiet = orig_quiet
     return
 
 
-
-
-
 @app.command
 def update(
-    datasource_name: str|Literal[".", "db"],
+    datasource_name: str | Literal[".", "db"],
     skip: bool = True,
     # ===== ETL Controls (defaults are for full-update) =====
     download: bool = True,
@@ -555,22 +561,26 @@ def update(
     ignore_errors: bool = False,
     quiet: bool = False,
     bell: bool = False,
-    **kwargs
 ) -> None:
     """Updates datasource by name, or all configured datasources ('.').
 
-    # NOTE!! By default, update is eager (it does as much work it can to complete the job)
-
+    Note: By default, this is an 'eager' function that uses the full ETL pipeline.
 
     Args:
-        datasource_name (str): The name of the datasource to update. Or use '.' for all,
+        datasource_name (str): The name of the datasource to update, or use '.' for all,
             or 'db' to update only the data warehouse
-        force (bool): Force the update (ignore things that might skip updates)
+        skip (bool): Skip update of datasource(s) that are already up to date
+        download (bool): Enable/disable the download function of the pipeline
+        read_cache (bool): Enable/disable the cache-reading function of the pipeline
+            (this forces the extract and transform)
+        validate (bool): Enable/disable the validate function of the pipeline
+        write_cache (bool): Enable/disable the cache-writing function of the pipeline
+        lazy (bool): Minimal update of database (WIP)
         ignore (list[str]): Datasources to ignore (use '--ignore=One --ignore=Two')
         skip_db (bool): Skip the database refresh
         ignore_errors (bool): Skips the update of a Datasource if it raises an error
         quiet (bool): Minimizes printed output
-        bell (bool): Activate the console bell (ding sound) when the process is complete
+        bell (bool): Activate the console bell (system ding sound) when the process is complete
         kwargs (dict): Use custom flags (e.g. `--flag=True`) and pass them to your functions as **kwargs
 
     Example:
@@ -592,7 +602,7 @@ def update(
     if not ignore:
         ignore = []
     # Determine datasources to process
-    datasources: list[boltetl.datasources.Datasource] | None = None
+    datasources: list[boltetl.Datasource] | None = None
     ## All
     if datasource_name == ".":
         datasources = list(WAREHOUSE.datasource_registry.values())
@@ -635,13 +645,11 @@ def update(
                 d.logger.info("Ignored (explicitly by user)")
                 continue
 
-            do_update = True
-
             # ----------------------------------------------------------------
             # HASH
             # Do recently updated check
             do_update: bool = True
-            #if not force:
+            # if not force:
             if skip:
                 d.logger.info("Comparing hashes")
                 do_update = WAREHOUSE.compare_hashes(d)
@@ -654,7 +662,7 @@ def update(
             # ----------------------------------------------------------------
             # UPDATE
             try:
-                #with console.status(f"[cyan]      Updating {d.name}...[/]"):
+                # with console.status(f"[cyan]      Updating {d.name}...[/]"):
                 d.logger.info("Calling update command")
                 # ===== Do the Update =====
                 d.update(
@@ -664,17 +672,9 @@ def update(
                     validate=validate,
                     write_cache=write_cache,
                     console=console,
-                    **kwargs
+                    #**kwargs,
                 )
                 # TODO: handle misc post-load callbacks
-                # Confirm load success
-                # with console.status(f"{d.name}: Confirming load..."):
-                #     if (
-                #         len(d.data) == 1 and d.name not in WAREHOUSE.list_tables()
-                #     ):  # TODO: not the best way to measure...
-                #         d.logger.critical("FAILURE: Table load could not be confirmed")
-                #         raise duckdb.DataError("Table does not exist after attempting load")
-                #     d.logger.info("Table load confirmed")
                 if d.raw_data_origin == RawDataOrigin.FROM_CACHE:
                     console.print(
                         f"        [green]Updated: {d.name}[/]  [bright_black](C:{d.cache_read_time} | L:{d.load_time})[/]"

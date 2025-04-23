@@ -1,10 +1,11 @@
 """DuckDB Data Warehouse"""
 
+from collections.abc import Callable, Generator
 from functools import wraps
 from graphlib import TopologicalSorter
 from logging import Logger
 from pathlib import Path
-from typing import Any, Callable, Generator, Literal
+from typing import Any, Literal, Self
 from warnings import warn
 
 import duckdb
@@ -29,14 +30,13 @@ init_scripts = [
 ]
 
 
-class Warehouse[T]:
+class Warehouse:
     """Bolt's default data warehouse (DuckDB)."""
 
     _ENV_LOADED = False
-    # Registries went here...
 
     def __init__(
-        self,
+        self: Self,
         path: Path,
         script_directory: Path | None = None,
         ignored_dependencies: set[str] | None = None,
@@ -163,7 +163,7 @@ class Warehouse[T]:
                 """Wrapper."""
                 tables = {}
                 for dep in dependencies:
-                    #tables[dep] = wh.get_data(dep)
+                    # tables[dep] = wh.get_data(dep)
                     tables[dep] = "TEST"
                 # Execute the user-function
                 result = func(self, tables, *args, **kwargs)
@@ -312,7 +312,7 @@ class Warehouse[T]:
             full_graph.append((g, t, deps))
         return full_graph
 
-    def execution_plan(self) -> Generator[T, None, None]:
+    def execution_plan(self) -> Generator[Self, None, None]:
         """Generates SQL scripts sorted by dependency requirements."""
         import boltetl.env
 
@@ -330,7 +330,7 @@ class Warehouse[T]:
 
     def create_schema_table(
         self,
-        dialect: Literal["duckdb", "arrow", "polars", "pandas", "numpy"] = "duckdb",
+        dialect: str | Literal["duckdb", "arrow", "polars", "pandas", "numpy"] = "duckdb",
         ignored_tables: list[str] | None = None,
         schema_table_name: str = "table_schemas",
     ):

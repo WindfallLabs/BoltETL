@@ -1,11 +1,12 @@
-"""Datasource ABC."""
+"""Datasource."""
 
+from collections.abc import Callable
 from enum import Enum
 from functools import wraps
 from logging import Logger
 from pathlib import Path
 from time import perf_counter_ns
-from typing import Any, Callable, Optional, Self
+from typing import Any, Optional, Self
 
 from duckdb import DataError
 from rich.console import Console
@@ -27,6 +28,7 @@ class ValidationError(Exception):
 
 class RawDataOrigin(Enum):
     """Describes the origin of the raw data."""
+
     INIT = "INIT"
     EXTRACTED = "EXTRACTED"
     FROM_CACHE = "FROM_CACHE"
@@ -86,25 +88,25 @@ class Datasource:
         Initialize a Datasource instance.
 
         Args:
-            name (str): Unique identifier for the datasource
+            name (str): Unique name for the datasource
             source_dir (Path|str): Path to the directory containing the raw source data
             source_filename (str): filename or glob pattern of raw source filename(s)
             cache_path (Path|str): Optionally set a filepath to cache to
                 (you must define function wrapped with `cache_write_wrapper`)
         """
         # Instance-specific attributes
-        self._name = name
-        self.source_dir = Path(source_dir) if isinstance(source_dir, str) else source_dir
-        self.source_filename = source_filename
+        self._name: str = name
+        self.source_dir: Path = Path(source_dir) if isinstance(source_dir, str) else source_dir
+        self.source_filename: str = source_filename
         self.cache_path = Path(cache_path) if isinstance(cache_path, str) else cache_path
 
         # Handle metadata
-        self.metadata = metadata if metadata else Metadata()
+        self.metadata: Metadata = metadata if metadata else Metadata()
         self.metadata.datasource = self
         # TODO: hash the stack of raw data here?
 
         # Handle options
-        self.options = options if options else Options()
+        self.options: Options = options if options else Options()
         self.options.parent = self
 
         # Logging setup
@@ -126,7 +128,7 @@ class Datasource:
         self._cache_write_time: tuple[float, float] | None = None
         self._cache_read_time: tuple[float, float] | None = None
 
-        # Processing attributes
+        # Pipeline functions
         self.download: Optional[Callable] = None
         self.extract: Optional[Callable] = None
         self.transform: Optional[Callable] = None
@@ -135,10 +137,8 @@ class Datasource:
         self.write_cache: Optional[Callable] = None
         self.read_cache: Optional[Callable] = None
 
-        # Wrapper aliases # TODO: good idea?
-        self.E = self.extract_wrapper
-        self.T = self.transform_wrapper
-        self.L = self.load_wrapper
+        # Tools
+        self.tool_names: list[str] = []
 
         # Register datasource
         if self.options.register:
@@ -228,7 +228,6 @@ class Datasource:
         if self._download_time:
             return time_diff(*self._download_time)
         return "-1"
-        
 
     @property
     def extract_time(self) -> str:
@@ -271,7 +270,7 @@ class Datasource:
     def download_wrapper(self, download_func: Callable) -> None:
         """
         Decorator to register the class's `download` method (optional).
-        
+
         The function that this decorator wraps must have the following arguments:
 
         Args:
@@ -291,6 +290,7 @@ class Datasource:
             return
 
         self.download = _download_wrapper
+        self.tool_names.append("download")  # Yes, download is a tool
         return
 
     def extract_wrapper(self, extract_func: Callable) -> None:
@@ -494,7 +494,7 @@ class Datasource:
         def _cache_write_wrapper(*args, **kwargs) -> None:
             if not (self.write_cache and self.cache_path):
                 raise AttributeError(
-                    f"`cache_path` attribute and `write_cache` function must both exist"
+                    "`cache_path` attribute and `write_cache` function must both exist"
                 )
 
             _start = perf_counter_ns()
@@ -533,7 +533,7 @@ class Datasource:
                 raise ValueError("Cache-reading function must return data")
             self._cache_read_time = (_start, perf_counter_ns())
             self.logger.info(f"Cached data read (in {self.cache_read_time})")
-            #self.state = ETLState.TRANSFORMED
+            # self.state = ETLState.TRANSFORMED
             self.state = ETLState.CACHE_READ
             self.raw_data_origin = RawDataOrigin.FROM_CACHE
             # TODO: read metadata JSON file
@@ -561,6 +561,7 @@ class Datasource:
             return tool_func(self, *args, **kwargs)  # Execute the tool
 
         setattr(self, tool_func.__name__, _tool_wrapper)
+        self.tool_names.append(tool_func.__name__)
         return
 
     # ========================================================================
@@ -599,7 +600,7 @@ class Datasource:
         validate=True,
         write_cache=True,
         console=None,
-        **kwargs
+        **kwargs,
     ) -> None:
         """
         Executes the ETL operations.
@@ -614,7 +615,7 @@ class Datasource:
             ValueError: If extract function is not defined
             ValidationError: If any validation fails
         """
-        _status = f"{self.name}: Setting up..."
+        _status: str = f"{self.name}: Setting up..."
         with console.status(f"      [cyan]{_status}[/]"):
             self.logger.info(f"Starting update for {self._name}")
             self.logger.debug(f"kwargs={kwargs}")
@@ -624,6 +625,7 @@ class Datasource:
                 self.logger.debug(f"Console passed as argument (quiet={console.quiet})")
             else:
                 from rich.console import Console
+
                 console = Console(quiet=True)
                 self.logger.debug(f"New console created (quiet={console.quiet})")
 
@@ -647,7 +649,7 @@ class Datasource:
 
         # --------------------------------------------------------------------
         # Extract / Read Cache
-        if self.read_cache and read_cache:  # arg
+        if self.read_cache is not None and read_cache is True:  # arg
             _status = f"{self.name}: Reading cache..."
             with console.status(f"      [cyan]{_status}[/]"):
                 self.logger.info(_status)
@@ -662,14 +664,12 @@ class Datasource:
         # Transform data if `transform` function was defined
         _status = f"{self.name}: Transforming..."
         with console.status(f"      [cyan]{_status}[/]"):
-            if self.transform and self.state < ETLState.TRANSFORMED:
+            if self.transform is not None and self.state < ETLState.TRANSFORMED:
                 self.logger.info(_status)
                 self.transform()
-            # Support the lack of transform 
-            elif not self.transform and self.state < ETLState.TRANSFORMED:
-                self.logger.warning(
-                    "No transform function defined; setting `data` to `raw_data`"
-                )
+            # Support the lack of transform
+            elif self.transform is None and self.state < ETLState.TRANSFORMED:
+                self.logger.warning("No transform function defined; setting `data` to `raw_data`")
                 self._data = self._raw_data
 
         # --------------------------------------------------------------------
@@ -685,7 +685,11 @@ class Datasource:
         # Optionally write transformed data to cache (disk)
         _status = f"{self.name}: Writing cache..."
         with console.status(f"      [cyan]{_status}[/]"):
-            if self.write_cache and self.raw_data_origin != RawDataOrigin.FROM_CACHE and write_cache:
+            if (
+                self.write_cache is not None
+                and self.raw_data_origin != RawDataOrigin.FROM_CACHE
+                and write_cache is True
+            ):
                 self.logger.info(_status)
                 self.write_cache()
 
@@ -693,7 +697,7 @@ class Datasource:
         # Load
         _status = f"{self.name}: Loading..."
         with console.status(f"      [cyan]{_status}[/]"):
-            if self.load:
+            if self.load is not None:
                 self.logger.info(_status)
                 self.load(warehouse)
             else:

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, ForwardRef
 
 if TYPE_CHECKING:
-    from bolt.core._datasource import (
+    from boltetl import (
         Datasource,  # NOTE: can't import this due to cyclical import
     )
 else:
