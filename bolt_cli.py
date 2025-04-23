@@ -80,7 +80,6 @@ def update_warehouse(
             # sql_file_count, compact_msg = warehouse.rebuild(compact=True)
             sql_file_count = warehouse.rebuild()
             # TODO: warehouse.create_schema_table()
-            success = True
             update_message = (
                 f"        [green]Updated[/]\n" f"            SQL Files Executed: {sql_file_count}"
             )
@@ -118,7 +117,7 @@ def update_warehouse(
 # Shell (idea)
 
 
-class Prompt(Cmd):
+class Prompt(Cmd):  # TODO: WIP
     prompt = "BoltETL> "
     intro = "BoltETL shell started!\n"
 
@@ -135,7 +134,6 @@ class Prompt(Cmd):
     def do_export(self, inp):
         ds, ft = inp.split(" ")
         data = WAREHOUSE.get_data(ds)
-        # TODO: ...
         return
 
     def do_extract(self, inp):
@@ -254,7 +252,7 @@ def env(
     # ------------------------------------------------------------------------
     # activate
     elif option == "activate":
-        # TODO: warn that env is already active
+        # TODO: warn that env is already active?
         boltetl.Config.activate_env(env_name)
         console.print(f"Activated environment: [green]{env_name} ({boltetl.Config.env_dir})[/]")
     console.print()
@@ -283,8 +281,9 @@ def most_recent(datasource_name: str | None = None) -> None:
         recent: tuple[str, float] = sorted(ages, key=lambda x: x[1], reverse=True)[0]
         ts = dt.datetime.fromtimestamp(recent[1]).strftime("%Y-%m-%d %I:%M %p")
         t = dt.datetime.now() - dt.datetime.fromtimestamp(recent[1])
-        # stale_after = v.get("stale_after", 20)  # TODO: handle stale-age
-        stale_after = 20  # TODO:
+        # TODO: handle stale-age
+        # stale_after = v.get("stale_after", 20)
+        stale_after = 20
         stale_color = "green"
 
         age: tuple[int, str]
@@ -362,7 +361,7 @@ def report(
     Example:
         `python bolt_cli.py report run ParatransitNoShows --start=20250101 --end=20250131`
     """
-    # TODO: write: bool = True?
+    # TODO: dry-run or console output only mode?
     # TODO: consider an '--update' flag to update report dependencies
     # e.g. python bolt_cli.py report run ParatransitNoShows --update
     option = option.lower()
@@ -398,7 +397,7 @@ def report(
         console.print(f"        (kwargs={kwargs})")
         try:
             rpt.run(*args, **kwargs)
-            if getattr(rpt, "_exported", False):  # TODO: WIP
+            if getattr(rpt, "_exported", False):  # TODO: ensure output exists?
                 console.print(f"        Exported results to '{rpt.out_path}'")
         except Exception as e:
             console.print(f"        [red]Failed: {e}")
@@ -416,11 +415,11 @@ def task(
     """
     if option == "list":
         console.print("Tasks List:")
-        console.print("        Task1  # WIP")  # TODO: dev
+        console.print("        Task1  # WIP")
     elif option == "add":
-        console.print(f"Added: {name}: {when}")  # TODO: dev
+        console.print(f"Added: {name}: {when}")
     elif option == "remove":
-        console.print(f"Removed: {name}")  # TODO: dev
+        console.print(f"Removed: {name}")
     return
 '''
 
@@ -622,7 +621,7 @@ def update(
         console.print(f"[red]Import Error(s) occured:[/] {loading_error_cnt}")
         for failed in boltetl.Datasource.failed_to_load:
             loading_errs.add(failed)
-            # TODO: log
+            WAREHOUSE.logger.error(f"Failed to import/load {failed[0]}: {failed[1]}")
             if failed in ignore or ignore_errors:
                 console.print(f"        [yellow]Error:   {failed[0]} ([i]ignored[/i])[/]")
             else:
@@ -662,7 +661,6 @@ def update(
             # ----------------------------------------------------------------
             # UPDATE
             try:
-                # with console.status(f"[cyan]      Updating {d.name}...[/]"):
                 d.logger.info("Calling update command")
                 # ===== Do the Update =====
                 d.update(
@@ -672,7 +670,6 @@ def update(
                     validate=validate,
                     write_cache=write_cache,
                     console=console,
-                    #**kwargs,
                 )
                 # TODO: handle misc post-load callbacks
                 if d.raw_data_origin == RawDataOrigin.FROM_CACHE:
