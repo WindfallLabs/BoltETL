@@ -130,6 +130,7 @@ class Datasource:
 
         # Pipeline functions
         self.download: Optional[Callable] = None
+        self._download_wrapper_used = False  # Download tool is skipped during update
         self.extract: Optional[Callable] = None
         self.transform: Optional[Callable] = None
         self.load = self._default_load  # TODO: good idea?
@@ -290,6 +291,7 @@ class Datasource:
             return
 
         self.download = _download_wrapper
+        self._download_wrapper_used = True
         self.tool_names.append("download")  # Yes, download is a tool
         return
 
@@ -619,8 +621,8 @@ class Datasource:
         with console.status(f"      [cyan]{_status}[/]"):
             self.logger.info(f"Starting update for {self._name}")
             self.logger.debug(f"kwargs={kwargs}")
-            self.logger.debug(f"Metadata:\n{self.metadata.to_json(json_indent=4)}")
-            self.logger.debug(f"Options:\n{self.options.to_json()}")  # TODO: json_indent=4
+            self.logger.debug(f"Metadata:\n{self.metadata.to_json()}")
+            self.logger.debug(f"Options:\n{self.options.to_json()}")  # TODO: json_indent=4 ?
             if console:
                 self.logger.debug(f"Console passed as argument (quiet={console.quiet})")
             else:
@@ -640,7 +642,7 @@ class Datasource:
         # Download (optional)
         _status = f"{self.name}: Downloading..."
         with console.status(f"      [cyan]{_status}[/]"):
-            if self.download:
+            if self.download and self._download_wrapper_used:
                 if download:  # arg
                     self.logger.info(_status)
                     self.download(**kwargs)
