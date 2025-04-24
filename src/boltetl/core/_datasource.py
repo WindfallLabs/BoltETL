@@ -591,6 +591,11 @@ class Datasource:
         """Utility method for passing a rich.console.Console to the tool."""
         return tool_kwargs.get("console", Console())
 
+    def set_load_only(self, load_only=True):
+        self.state = ETLState.TRANSFORMED
+        return
+        
+
     # ========================================================================
     # Update method
 
@@ -631,13 +636,6 @@ class Datasource:
                 console = Console(quiet=True)
                 self.logger.debug(f"New console created (quiet={console.quiet})")
 
-            # Check that `extract` method is set
-            # Unless directly set with `data_wrapper`
-            if not self.extract or self.state >= ETLState.EXTRACTED:
-                extract_error_msg = "An `extract` function is required"
-                self.logger.critical(extract_error_msg)
-                raise ValueError(extract_error_msg)
-
         # --------------------------------------------------------------------
         # Download (optional)
         _status = f"{self.name}: Downloading..."
@@ -656,11 +654,13 @@ class Datasource:
             with console.status(f"      [cyan]{_status}[/]"):
                 self.logger.info(_status)
                 self.read_cache()  # Sets state to TRANSFORMED
-        else:
+        elif self.extract is not None and self.state < ETLState.EXTRACTED:
             _status = f"{self.name}: Extracting..."
             with console.status(f"      [cyan]{_status}[/]"):
                 self.logger.info(_status)
                 self.extract(**kwargs)
+        else:
+            self.logger.info("No extract function defined")
 
         # --------------------------------------------------------------------
         # Transform data if `transform` function was defined
@@ -708,25 +708,26 @@ class Datasource:
 
         # --------------------------------------------------------------------
         # Confirm load success
-        _status = f"{self.name}: Confirming load..."
-        with console.status(f"      [cyan]{_status}[/]"):
-            tables = set(warehouse.list_tables())
-            if isinstance(self.data, (tuple, list, dict)):
-                if isinstance(self.data, (tuple, list)):
-                    names = set([i[0] for i in self.data])
-                else:
-                    names = set([i for i in self.data.keys()])
-                if not names.issubset(tables):
-                    self.logger.critical("FAILURE: Table load could not be confirmed")
-                    raise DataError(f"Not all tables ({len(names)}) exist after attempting load")
-            elif self.name not in tables:
-                self.logger.critical("FAILURE: Table load could not be confirmed")
-                raise DataError(f"Table '{self.name}' does not exist after attempting load")
-            self.logger.info("Table load confirmed")
+        # TODO: this just isn't the way we should do this... keeping code here for now
+        # _status = f"{self.name}: Confirming load..."
+        # with console.status(f"      [cyan]{_status}[/]"):
+        #     tables = set(warehouse.list_tables())
+        #     if isinstance(self.data, (tuple, list, dict)):
+        #         if isinstance(self.data, (tuple, list)):
+        #             names = set([i[0] for i in self.data])
+        #         else:
+        #             names = set([i for i in self.data.keys()])
+        #         if not names.issubset(tables):
+        #             self.logger.critical("FAILURE: Table load could not be confirmed")
+        #             raise DataError(f"Not all tables ({len(names)}) exist after attempting load")
+        #     elif self.name not in tables:
+        #         self.logger.critical("FAILURE: Table load could not be confirmed")
+        #         raise DataError(f"Table '{self.name}' does not exist after attempting load")
+        #     self.logger.info("Table load confirmed")
 
-        _status = f"{self.name}: Complete"
-        with console.status(f"      [cyan]{_status}[/]"):
-            self.logger.info(f"Updated '{self.name}'!")
+        # _status = f"{self.name}: Complete"
+        # with console.status(f"      [cyan]{_status}[/]"):
+        #     self.logger.info(f"Updated '{self.name}'!")
         # --------------------------------------------------------------------
         return
 
