@@ -631,6 +631,7 @@ def update(
     # Process datasources
     if datasources:
         tables_loaded = 0
+        _spacing = max([len(d.name) for d in datasources]) + 2
         console.print(f"Updating datasources ({len(datasources)}):")
 
         # Log to each Datasource's log
@@ -638,6 +639,7 @@ def update(
             d.logger.info("============== Bolt-CMD ==============")
             d.logger.info(f"Started update for {d.name} (by {USER})")
             d.logger.info(f"Args: `{_args}`")
+            spacing = " " * (_spacing - len(d.name))
 
             if d.name in ignore:
                 console.print(f"        [yellow]Skipped: {d.name} ([i]ignored[/i])[/]")
@@ -648,7 +650,6 @@ def update(
             # HASH
             # Do recently updated check
             do_update: bool = True
-            # if not force:
             if skip:
                 d.logger.info("Comparing hashes")
                 do_update = WAREHOUSE.compare_hashes(d)
@@ -674,11 +675,11 @@ def update(
                 # TODO: handle misc post-load callbacks
                 if d.raw_data_origin == RawDataOrigin.FROM_CACHE:
                     console.print(
-                        f"        [green]Updated: {d.name}[/]  [bright_black](C:{d.cache_read_time} | L:{d.load_time})[/]"
+                        f"        [green]Updated: {d.name}[/]{spacing}[bright_black](C:{d.cache_read_time} | L:{d.load_time})[/]"
                     )
                 else:
                     console.print(
-                        f"        [green]Updated: {d.name}[/]  [bright_black](E:{d.extract_time} | T:{d.transform_time} | L:{d.load_time})[/]"
+                        f"        [green]Updated: {d.name}[/]{spacing}[bright_black](E:{d.extract_time} | T:{d.transform_time} | L:{d.load_time})[/]"
                     )
                 WAREHOUSE.logger.info(f"Loaded {d.name}")
             except Exception as e:
@@ -700,7 +701,7 @@ def update(
 
     # ========================================================================
     # Update database
-    console.print("Updating database:")
+    console.print(f"Updating database ([bright_cyan]{WAREHOUSE.name}[/]):")
     if len(errors) > 0 and not ignore_errors:
         skip_db = True  # Override the skip_db flag
 
