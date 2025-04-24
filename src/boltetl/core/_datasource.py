@@ -6,7 +6,7 @@ from functools import wraps
 from logging import Logger
 from pathlib import Path
 from time import perf_counter_ns
-from typing import Any, Optional, Self
+from typing import Any, Literal, Optional, Self
 
 from duckdb import DataError
 from rich.console import Console
@@ -67,6 +67,9 @@ class ETLState(Enum):
         this = self._member_names_.index(self.name)
         oth = other._member_names_.index(other.name)
         return this >= oth
+
+
+type State = Literal[*ETLState.__members__.keys()]  # type: ignore
 
 
 class Datasource:
@@ -591,8 +594,9 @@ class Datasource:
         """Utility method for passing a rich.console.Console to the tool."""
         return tool_kwargs.get("console", Console())
 
-    def set_load_only(self, load_only=True):
-        self.state = ETLState.TRANSFORMED
+    def set_state(self, state: State):
+        """Expose a state setter to users."""
+        self.state = ETLState.__members__[state]
         return
         
 
