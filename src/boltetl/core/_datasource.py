@@ -595,7 +595,6 @@ class Datasource:
         return tool_kwargs.get("console", Console())
 
     def set_state(self, state: State):
-        """Expose a state setter to users."""
         self.state = ETLState.__members__[state]
         return
         
@@ -743,3 +742,12 @@ class Datasource:
         String representation of the Datasource instance.
         """
         return f"<Datasource(name='{self._name}')>"
+
+
+# Inject a smarter docstring
+Datasource.set_state.__doc__ = f"""
+    Expose a state setter to users.
+
+    Args:
+        state ({State.__value__}): Manually/override the datasource's (ETL) state
+    """
