@@ -102,6 +102,8 @@ class Datasource:
         self.source_dir: Path = Path(source_dir) if isinstance(source_dir, str) else source_dir
         self.source_filename: str = source_filename
         self.cache_path = Path(cache_path) if isinstance(cache_path, str) else cache_path
+        # Support post-load SQL (e.g. indexing, etc.)
+        self.sql_callbacks = []
 
         # Handle metadata
         self.metadata: Metadata = metadata if metadata else Metadata()
@@ -578,6 +580,8 @@ class Datasource:
         try:
             _start = perf_counter_ns()
             df = self.data  # noqa: F841
+            if df is None:
+                raise AttributeError("Data is None")
             with warehouse.connect() as con:
                 con.sql(f"CREATE OR REPLACE TABLE {self.name} AS SELECT * FROM df")
             self._load_time = (_start, perf_counter_ns())
@@ -676,6 +680,8 @@ class Datasource:
             elif self.transform is None and self.state < ETLState.TRANSFORMED:
                 self.logger.warning("No transform function defined; setting `data` to `raw_data`")
                 self._data = self._raw_data
+                if self._data is None:
+                    self.logger.error("Data is None")
 
         # --------------------------------------------------------------------
         # Validate
@@ -708,6 +714,19 @@ class Datasource:
             else:
                 self.logger.info("Loading (using default function)")
                 self._default_load(warehouse)
+
+        # --------------------------------------------------------------------
+        # SQL Callbacks
+        _status = f"{self.name}: Executing SQL callbacks..."
+        if self.sql_callbacks:
+            with console.status(f"      [cyan]{_status}[/]"):
+                for q in self.sql_callbacks:
+                    self.logger.info(f"Executing Callback: `{q}`")
+                    try:
+                        with warehouse.connect() as con:
+                            con.sql(q)  # TODO: Begin/Commit?
+                    except Exception as e:
+                        self.logger.error(e)  # TODO: Rollback?
 
         # --------------------------------------------------------------------
         # Confirm load success

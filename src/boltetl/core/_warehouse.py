@@ -260,6 +260,8 @@ class Warehouse:
         name = str(self.path.name)
         old_size = self.path.stat().st_size / 1024
         new_db = Path(str(self.path).replace(name, "_compacting.duckdb"))
+        for ext in self.extensions:
+            duckdb.load_extension(ext)
         duckdb.sql(f"ATTACH '{self.path}' AS db1;")
         duckdb.sql(f"ATTACH '{new_db}' AS db2;")
         duckdb.sql("COPY FROM DATABASE db1 TO db2;")
@@ -365,16 +367,19 @@ class Warehouse:
             r = con.sql(script.sql).pl()
         return r
 
-    def get_data(self, table_name) -> pl.DataFrame:
+    def get_data(self, table_name, dataframe_lib: str|Literal["polars", "pandas"] ="polars") -> pl.DataFrame:
         """Return a table from the warehouse by name."""
         if table_name not in self.list_tables():
             raise KeyError(f"'{table_name}' table/view does not exist")  # TODO: exception type
         with self.connect() as con:
             try:
-                df = con.sql(f"SELECT * FROM {table_name};").pl()
+                tbl = con.sql(f"SELECT * FROM {table_name};")
+                if dataframe_lib == "pandas":
+                    df = tbl.df()
+                else:
+                    df = tbl.pl()
             except pl.exceptions.ComputeError:
-                df = con.sql(f"SELECT * FROM {table_name};").df()
-                df = pl.from_pandas(df)
+                df = pl.from_pandas(tbl.df())
         return df
 
     def get_table_schema(  # type: ignore[return]
