@@ -107,7 +107,7 @@ def make_logger(
 
     # Add file handler
     log_file = log_dir.joinpath(f"{name}.log")
-    file_handler = logging.FileHandler(log_file)
+    file_handler = logging.FileHandler(log_file)  # TODO: error handling
     file_handler.setFormatter(formatter)
     file_handler.setLevel(level)
     logger.addHandler(file_handler)

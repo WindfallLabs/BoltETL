@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """A command line utility for managing ETL pipelines and environments.
 
 For more info, use:
@@ -50,7 +51,7 @@ STYLE: Final = CONFIG["style"]
 
 
 def update_warehouse(
-    console, warehouse, compact=True, quiet=False
+    console, warehouse, compact=True, quiet=False, ignore: list[str] | None = None
 ) -> list[tuple[str, Exception]]:
     """Core functionality for updating the database warehouse.
 
@@ -72,34 +73,53 @@ def update_warehouse(
         - errors: List of (name, exception) tuples for any errors
     """
     errors: list[tuple[str, Exception]] = []
+    if ignore is None:
+        ignore = []
     if quiet:
         console.quiet = True
 
-    with console.status("      Updating database..."):
-        try:
-            # sql_file_count, compact_msg = warehouse.rebuild(compact=True)
-            sql_file_count = warehouse.rebuild()
-            # TODO: warehouse.create_schema_table()
-            update_message = (
-                f"        [green]Updated[/]\n" f"            SQL Files Executed: {sql_file_count}"
-            )
-        except Exception as e:
-            errors.append((warehouse.name, e))
-            update_message = f"        [red]Failed: {warehouse.name}[/]"
-            console.print_exception()
-        finally:
-            console.print(update_message)
+    sql_file_count = 0
+    with warehouse.connect() as con:
+        for sql_obj in warehouse.execution_plan():
+            if sql_obj.name in ignore:
+                console.print(f"        [yellow]Skipped: {sql_obj.name}[/]{spacing}")
+                continue
+            try:
+                _start = time.perf_counter_ns()
+                with console.status(f"      [cyan]{sql_obj.name}: Executing...[/]"):
+                    con.sql(sql_obj.sql)
+                    _end = time.perf_counter_ns()
+                _t = time_diff(_start, _end)
+                sql_file_count += 1
+                spacing = " "  # TODO: do this
+                exec_message = (
+                    f"        [green]Updated: {sql_obj.name}[/]{spacing}[bright_black](SQL:{_t})[/]"
+                )
+            except Exception as e:  # TODO: binder errors?
+                exec_message = f"        [red]Failed: {sql_obj.name}[/]"
+                p = getattr(sql_obj, "path", sql_obj.name)
+                e.args = (f"{e.args[0]} --> {p}", *e.args[1:])
+                raise e
+            finally:
+                console.print(exec_message)
+
+        # TODO: warehouse.create_schema_table()
+        update_message = (
+            f"    SQL Files Executed: {sql_file_count}\n"
+        )
+    console.print(update_message)
 
     # compact option
     if compact:
+        console.print(f"Compacting database ([bright_cyan]{WAREHOUSE.name}[/]):")
         with console.status("      Compacting..."):
             try:
                 size_before, size_after = WAREHOUSE.compact()
                 reduction = size_before - size_after
                 percent = (reduction / size_before) * 100 if size_before > 0 else 0
                 compact_message = (
-                    f"        [green]Compacted[/]\n"
-                    f"            {size_before / 1024**2:.5f} MB → "
+                    #f"        [green]Compacted[/]\n"
+                    f"    Compacted: {size_before / 1024**2:.5f} MB → "
                     f"{size_after / 1024**2:.5f} MB "
                     f"[bright_black](-{percent:.1f}%)[/]"
                 )
@@ -464,7 +484,7 @@ def table(
         return
     if not tbl_name:
         raise AttributeError("A table name is required")
-    elif option == "preview":
+    elif option == "show":
         console.print(f"Preview of [cyan]{tbl_name}[/]:")
         pl.Config.set_tbl_rows(rows)
         pl.Config.set_tbl_cols(cols)
@@ -485,7 +505,17 @@ def table(
     return
 
 
-# NEW
+@app.command
+def datasource(
+    option: str | Literal["list", "info", "update"],
+) -> None:
+    option = option.lower()
+    if option == "list":
+        ...
+
+
+
+# NEW - WIP
 @app.command
 def warehouse(
     option: str | Literal["info", "update"],
@@ -527,7 +557,7 @@ def warehouse(
     # update option
     elif option == "update":
         # Call the core warehouse update function
-        errors: list[tuple[str, Exception]] = update_warehouse(console, WAREHOUSE, compact, quiet)
+        errors: list[tuple[str, Exception]] = update_warehouse(console, WAREHOUSE, compact, quiet)  # TODO:
 
     # Handle errors
     if len(errors) > 0:
@@ -692,7 +722,7 @@ def update(
                 d.logger.info("Complete")
             # ----------------------------------------------------------------
             tables_loaded += 1
-        console.print(f"    Tables Loaded: {tables_loaded}")
+        console.print(f"    Datasources Updated: {tables_loaded}")  # TODO: more accurate counts?
         if ignore:
             console.print(f"    Ignored: [yellow]{len(ignore)}[/]")
 
@@ -711,7 +741,7 @@ def update(
         else:
             console.print("        [yellow]Skipped ([i]ignored[/i])[/]")
     else:
-        update_warehouse(console, WAREHOUSE, compact=compact)
+        update_warehouse(console, WAREHOUSE, compact=compact, ignore=ignore)
 
     # Print error info
     err_cnt = f"{len(errors) + loading_error_cnt}"
@@ -740,7 +770,8 @@ def update(
 
 t_init_end = time.perf_counter_ns()
 
-if __name__ == "__main__":
+
+def main() -> None:
     try:
         t_start = time.perf_counter_ns()
         # BoltETL logo and app info
@@ -761,3 +792,8 @@ if __name__ == "__main__":
         console.print(f"\n[bright_black](Init Time: {time_diff(t_init_start, t_init_end)})[/]")
         console.print(f"[bright_black](Execution Time: {time_diff(t_start, t_end)})[/]\n")
         console.rule(style=STYLE)
+    return
+
+
+if __name__ == "__main__":
+    main()

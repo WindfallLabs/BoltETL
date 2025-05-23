@@ -37,7 +37,7 @@ class Warehouse:
 
     def __init__(
         self: Self,
-        path: Path,
+        path: Path | str,
         script_directory: Path | None = None,
         ignored_dependencies: set[str] | None = None,
         extensions: set[str] | None = None,
@@ -46,6 +46,8 @@ class Warehouse:
         duckdb_sql_return_method: str | None = "pl",
     ):
         """Warehouse class."""
+        if isinstance(path, str):
+            path = Path(path)
         self._path = path
         self._script_directory = script_directory
         self.ignored_dependencies = ignored_dependencies or set()
@@ -323,11 +325,15 @@ class Warehouse:
 
         for dep_name, dep_type, deps in graph:
             # Raise error on missing dependencies
-            if dep_type == "MISSING":
-                raise KeyError(
-                    f"Dependency '{dep_name}' is not defined"
-                )  # TODO: should we raise here or let it roll?
-            obj = self.sql_registry[dep_name]
+            #if dep_type == "MISSING":
+                #raise KeyError(
+                #    f"Dependency '{dep_name}' is not defined"
+                #)  # TODO: should we raise here or let it roll?
+            try:
+                obj = self.sql_registry[dep_name]
+            except KeyError as e:
+                # TODO: print ignore message?
+                continue
             yield obj
 
     def create_schema_table(
@@ -520,7 +526,7 @@ class Warehouse:
             _ = SQL(path=script_path)  # initialization registers the objects
         return
 
-    def rebuild(self, destroy=False, compact=True):
+    def rebuild(self):  # TODO: remove?
         """Execute SQL scripts against the warehouse."""
         # Deletes the DuckDB file if `destroy==True`
         # TODO: Execute all necessary Datasource ETL pipelines (remove from bolt_cli.py?)
