@@ -445,17 +445,20 @@ def task(
 
 
 @app.command
-def execution_order() -> None:
+def execution_order(verbose=False) -> None:
     """Displays the order that registered SQL files will be executed in."""
     boltetl.env.datasources.load_all()
-    file_order: list[str] = [i.path.name for i in WAREHOUSE.execution_plan() if i.path]
-    console.print(f"SQL Execution Order ({len(file_order)} files):")
-    for n, i in enumerate(file_order):
-        n += 1
-        num = f"{n}"
-        if n < 10:
-            num = f" {n}"
-        console.print(f"        {num}) [green]{i}[/]")
+    file_deps: list[str] = [(i.path.name, i.dependencies) for i in WAREHOUSE.execution_plan() if i.path]
+    console.print(f"SQL Execution Order ({len(file_deps)} files):")
+    for i, d in enumerate(file_deps, start=1):
+        num = f"{i}"
+        if i < 10:
+            num = f" {i}"
+        if verbose:
+            msg = f"        {num}) [green]{d[0]}[/] [bright_black]{d[1]}[/]"
+        else:
+            msg = f"        {num}) [green]{d[0]}[/]"
+        console.print(msg)
     console.print()
     return
 
