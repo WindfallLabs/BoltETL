@@ -12,6 +12,21 @@ from boltetl.core._options import Options
 
 calendar.setfirstweekday(1)
 
+season_lookup = {
+    "Dec": "Winter",
+    "Jan": "Winter",
+    "Feb": "Winter",
+    "Mar": "Spring",
+    "Apr": "Spring",
+    "May": "Spring",
+    "Jun": "Summer",
+    "Jul": "Summer",
+    "Aug": "Summer",
+    "Sep": "Fall",
+    "Oct": "Fall",
+    "Nov": "Fall",
+}
+
 options = Options(
     # TODO: some way to toggle ignored
     register=False,
@@ -80,6 +95,14 @@ def data(obj):
                 .map_elements(lambda x: {1: 3, 2: 4, 3: 1, 4: 2}[x], return_dtype=pl.Int8)
                 .alias("FiscalQuarter")
             ),
+            # Season
+            #(
+            #    pl.col("Date").dt.strftime("%b").map_elements(
+            #        lambda x: season_lookup[x],
+            #        return_dtype=pl.String)
+            #    .alias("Season")
+            #),
+            pl.col("Date").dt.strftime("%b").replace_strict(season_lookup).alias("Season"),
             # Day
             pl.col("Date").dt.strftime("%d").cast(pl.Int32).alias("Day"),
             # Day Abbr
@@ -99,6 +122,7 @@ def data(obj):
             "FiscalYear",
             "Quarter",
             "FiscalQuarter",
+            "Season",
             "Month",
             "MonthName",
             "MonthAbbr",
